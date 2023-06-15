@@ -57,7 +57,6 @@ const createData = async (req, res, next) => {
   }
 };
 // registration
-// post data
 const registration = async (req, res, next) => {
   // Validate request body using Joi
   var db = req.db;
@@ -65,16 +64,12 @@ const registration = async (req, res, next) => {
     mobile: Joi.string().min(3).required(),
     password: Joi.string().min(6).required(),
   });
-
   const { error, value } = schema.validate(req.body);
-
   if (error) {
     res.status(400).json({ error: error.details[0].message });
     return;
   }
-
   const { mobile, password } = value;
-
   // Check if the username is already taken
   db.query("SELECT * FROM user WHERE mobile = ?", [mobile], (err, rows) => {
     if (err) {
@@ -89,9 +84,10 @@ const registration = async (req, res, next) => {
     }
 
     // Insert the user into the database
+    bcrypt.hash(password, 10, (err, hashedPassword) => {
     db.query(
       "INSERT INTO user (mobile, password) VALUES (?, ?)",
-      [mobile, password],
+      [mobile, hashedPassword],
       (err, result) => {
         if (err) {
           console.error("Error executing query: ", err);
@@ -102,7 +98,47 @@ const registration = async (req, res, next) => {
         res.status(201).json({ message: "Registration successful!" });
       }
     );
+    })
   });
 };
 
-module.exports = { displayData, createData, registration };
+
+const userLogin = async (req, res, next) => {
+  // Validate request body using Joi
+  var db = req.db;
+  const { mobile, password } = req.body;
+
+  // Retrieve the user from the database based on the username
+  db.query('SELECT * FROM user WHERE mobile = ?', [mobile], (err, rows) => {
+    if (err) {
+      console.error('Error executing query: ', err);
+      res.status(500).json({ error: 'Internal server error' });
+      return;
+    }
+
+    if (rows.length === 0) {
+      res.status(401).json({ error: 'Authentication failed' });
+      return;
+    }
+
+    const user = rows[0];
+
+    // Compare the provided password with the stored hash
+    bcrypt.compare(password, user.password, (err, result) => {
+      if (err) {
+        console.error('Error comparing passwords: ', err);
+        res.status(500).json({ error: 'Internal server error' });
+        return;
+      }
+
+      if (!result) {
+        res.status(401).json({ error: 'Authentication failed' });
+        return;
+      }
+
+      res.status(200).json({ message: 'Authentication successful!' });
+    });
+  });
+};
+
+module.exports = { displayData, createData, registration,userLogin };

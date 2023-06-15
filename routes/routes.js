@@ -17,4 +17,5 @@ const upload=multer({
 router.get('/showAll', controller.displayData);
 router.post('/create', upload.single('image'), controller.createData);
 router.post('/userCreate', controller.registration)
+router.post('/login', controller.userLogin)
 module.exports = router;
