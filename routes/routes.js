@@ -16,4 +16,5 @@ const upload=multer({
 // formdata api
 router.get('/showAll', controller.displayData);
 router.post('/create', upload.single('image'), controller.createData);
+router.post('/userCreate', controller.registration)
 module.exports = router;
