@@ -4,23 +4,24 @@ var bodyParser = require('body-parser');
 var cookieParser = require('cookie-parser');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const http = require('http');
+var mysql = require('mysql');
+require("dotenv").config();
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 app.use(cookieParser());
 app.use(cors());
-
-
 const routes = require('./routes/routes')
 
 
-var mysql = require('mysql');
+
 var db = mysql.createConnection({
-    host: "localhost",
-    user: "root",
-    password: "",
-    database: "areaphonebook"
+    host: process.env.DB_HOST,
+    user: process.env.DB_USERNAME,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME
 });
 db.connect(function (err) {
     if (err) {
@@ -30,7 +31,8 @@ db.connect(function (err) {
         console.log('db connect');
     }
 })
-app.listen(8000, () => console.log("Listening port 8000"));
+const port = process.env.PORT || 8000;
+app.listen(port, () => console.log("Listening port 8000"));
 
 app.use(function (req, res, next) {
     req.db = db;
