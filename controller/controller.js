@@ -122,6 +122,7 @@ const createShop = async (req, res, next) => {
   try {
     var db = req.db;
     var data = {
+      shop_id: req.body.shop.shop_id,
       mobile: req.body.shop.mobile,
       shop_owner: req.body.shop.shop_owner,
       shop_name: req.body.shop.shop_name,
@@ -203,7 +204,7 @@ const categoryList = async (req, res, next) => {
     });
   }
 };
-// category list
+// all category list
 const allSubcategoryList = async (req, res, next) => {
   try {
     var db = req.db;
@@ -409,6 +410,7 @@ const pendingShop = async (req, res, next) => {
   try {
     var db = req.db;
     var data = {
+      shop_id: req.body.shop.shop_id,
       mobile: req.body.shop.mobile,
       shop_owner: req.body.shop.shop_owner,
       shop_name: req.body.shop.shop_name,
@@ -468,7 +470,6 @@ const pendingList = async (req, res, next) => {
 const deletePending = async (req, res, next) => {
   const userMobile = req.params.id;
   var db = req.db;
- console.log(userMobile);
   try {
     const deleteQuery = `DELETE FROM pending_shop WHERE mobile = ${userMobile}`;
     db.query(deleteQuery, (err, result) => {
@@ -486,6 +487,32 @@ const deletePending = async (req, res, next) => {
     res.status(500).send('Error deleting data.');
   }
 }
+//single shop
+const singleShop = async (req, res, next) => {
+  try {
+    const db = req.db;
+    const shopId = req.params.id;
+    const query = "SELECT * FROM shop WHERE id = ?";
+    db.query(query, [shopId], (err, results) => {
+      if (err) {
+        console.error("Error fetching shop:", err);
+        return;
+      }
+
+      if (results.length > 0) {
+        res.status(200).json(results[0]); // Return the first shop found
+      } else {
+        res.status(404).json({
+          message: "Shop not found",
+        });
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error retrieving shop",
+    });
+  }
+};
 
 module.exports = {
   displayData,
