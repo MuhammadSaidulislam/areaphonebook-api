@@ -53,10 +53,8 @@ const userLogin = async (req, res, next) => {
   // Validate request body using Joi
   var db = req.db;
   const { mobile, password } = req.body;
-  console.log(req.body);
   // Retrieve the user from the database based on the username
   db.query("SELECT * FROM user WHERE mobile = ?", [mobile], (err, rows) => {
-    console.log(err);
     if (err) {
       console.log("Error executing query: ", err);
       res.status(500).json({ error: "Internal server error" });
@@ -83,9 +81,9 @@ const userLogin = async (req, res, next) => {
         return;
       }
       const token = jwt.sign({ mobile }, SECRET_KEY);
-  //    res.status(200).json(result);
+      //    res.status(200).json(result);
       if (result) {
-        const { mobile } = rows[0]; 
+        const { mobile } = rows[0];
         res.status(200).json({ mobile });
       } else {
         res.status(404).json({
@@ -99,7 +97,7 @@ const userLogin = async (req, res, next) => {
 const displayData = async (req, res, next) => {
   try {
     var db = req.db;
-  
+
     let results = await db.query("Select * from shop", function (error, rows) {
       if (error) {
         console.log("Error db");
@@ -131,7 +129,7 @@ const createShop = async (req, res, next) => {
       email: req.body.shop.email,
       ward: req.body.shop.ward,
       address: req.body.shop.address,
-      service: req.body.shop.service
+      service: req.body.shop.service,
       // image: req.file.filename,
     };
     let result = await db.query(
@@ -278,7 +276,7 @@ const shopList = async (req, res, next) => {
     var db = req.db;
     // const category_Id = req.params.categoryId;
     const { subCategoryName } = req.body;
-  
+
     // Fetch subcategories under the specified category
     const query = "SELECT * FROM shop WHERE sub_category = ?";
     db.query(query, [subCategoryName], (err, results) => {
@@ -390,7 +388,6 @@ const userProfile = async (req, res, next) => {
         return;
       }
 
-      
       if (results.length > 0) {
         res.status(401).json(results);
       } else {
@@ -419,7 +416,7 @@ const pendingShop = async (req, res, next) => {
       email: req.body.shop.email,
       ward: req.body.shop.ward,
       address: req.body.shop.address,
-      service: req.body.shop.service
+      service: req.body.shop.service,
       // image: req.file.filename,
     };
     let result = await db.query(
@@ -468,31 +465,31 @@ const pendingList = async (req, res, next) => {
   }
 };
 const deletePending = async (req, res, next) => {
-  const userMobile = req.params.id;
+  const shopId = req.params.id;
   var db = req.db;
   try {
-    const deleteQuery = `DELETE FROM pending_shop WHERE mobile = ${userMobile}`;
-    db.query(deleteQuery, (err, result) => {
+    const deleteQuery = "DELETE FROM pending_shop WHERE shop_id = ?";
+    db.query(deleteQuery, [shopId], (err, result) => {
       if (err) {
-        console.error('Error deleting data from the database: ', err);
-        res.status(500).send('Error deleting data.');
+        console.error("Error deleting data from the database: ", err);
+        res.status(500).send("Error deleting data.");
         return;
       }
 
-      console.log('Data deleted successfully.');
+      console.log("Data deleted successfully.");
       res.sendStatus(200);
     });
   } catch (err) {
-    console.error('Error deleting data: ', err);
-    res.status(500).send('Error deleting data.');
+    console.error("Error deleting data: ", err);
+    res.status(500).send("Error deleting data.");
   }
-}
+};
 //single shop
 const singleShop = async (req, res, next) => {
   try {
     const db = req.db;
-    const shopId = req.params.id;
-    const query = "SELECT * FROM shop WHERE id = ?";
+     const shopId = req.params.id;
+    const query = "SELECT * FROM shop WHERE shop_id = ?";
     db.query(query, [shopId], (err, results) => {
       if (err) {
         console.error("Error fetching shop:", err);
@@ -530,5 +527,6 @@ module.exports = {
   userProfile,
   pendingShop,
   pendingList,
-  deletePending
+  deletePending,
+  singleShop,
 };
