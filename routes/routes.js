@@ -23,6 +23,7 @@ router.get('/allSubcategoryList', controller.allSubcategoryList)
 router.post('/subcategory', controller.createSubCategory)
 router.post('/subcategorylist', controller.getSubCategory)
 router.post('/AllShopList', controller.shopList)
+router.post('/singleShopShow/:id', controller.singleShop)
 router.get('/showAll', controller.displayData);
 router.post('/create', upload.single('image'), controller.createShop);
 router.post('/pendingShop', upload.single('image'), controller.pendingShop);
@@ -30,4 +31,5 @@ router.get('/pending', controller.pendingList)
 router.delete('/pendingDelete/:id', controller.deletePending)
 router.post('/adminSignup', controller.adminRegistration)
 router.post('/admin', controller.adminLogin)
+router.post('/mobileCheck', controller.mobileNumberCheck)
 module.exports = router;
