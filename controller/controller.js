@@ -41,8 +41,7 @@ const registration = async (req, res, next) => {
             res.status(500).json({ error: "Internal server error" });
             return;
           }
-
-          res.status(201).json({ message: "Registration successful!" });
+          res.status(200).json({ mobile });
         }
       );
     });
@@ -92,6 +91,30 @@ const userLogin = async (req, res, next) => {
       }
     });
   });
+};
+// login mobile number check
+const mobileNumberCheck = async (req, res, next) => {
+  var db = req.db;
+  const { mobileNumber } = req.body;
+  db.query(
+    "SELECT * FROM user WHERE mobile = ?",
+    [mobileNumber],
+    (error, results) => {
+      if (error) {
+        // Handle any database error
+        console.error("Error executing query:", error);
+        return res.status(500).json({ message: "Internal server error" });
+      }
+
+      if (results.length > 0) {
+        // Mobile number exists
+        return res.json({ exists: true });
+      } else {
+        // Mobile number does not exist
+        return res.json({ exists: false });
+      }
+    }
+  );
 };
 // all shop data
 const displayData = async (req, res, next) => {
@@ -488,7 +511,7 @@ const deletePending = async (req, res, next) => {
 const singleShop = async (req, res, next) => {
   try {
     const db = req.db;
-     const shopId = req.params.id;
+    const shopId = req.params.id;
     const query = "SELECT * FROM shop WHERE shop_id = ?";
     db.query(query, [shopId], (err, results) => {
       if (err) {
@@ -529,4 +552,5 @@ module.exports = {
   pendingList,
   deletePending,
   singleShop,
+  mobileNumberCheck,
 };
