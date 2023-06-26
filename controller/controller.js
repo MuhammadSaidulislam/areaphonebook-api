@@ -144,6 +144,7 @@ const createShop = async (req, res, next) => {
     var db = req.db;
     var data = {
       shop_id: req.body.shop.shop_id,
+      post_id: req.body.shop.post_id,
       mobile: req.body.shop.mobile,
       shop_owner: req.body.shop.shop_owner,
       shop_name: req.body.shop.shop_name,
@@ -431,6 +432,7 @@ const pendingShop = async (req, res, next) => {
     var db = req.db;
     var data = {
       shop_id: req.body.shop.shop_id,
+      post_id: req.body.shop.post_id,
       mobile: req.body.shop.mobile,
       shop_owner: req.body.shop.shop_owner,
       shop_name: req.body.shop.shop_name,
@@ -533,6 +535,27 @@ const singleShop = async (req, res, next) => {
     });
   }
 };
+// post list
+const postList = async (req, res, next) => {
+  try {
+    var db = req.db;
+    const { userMobile } = req.body;
+    const query = `SELECT * FROM shop WHERE mobile = ? AND post_id != ''`;
+    db.query(query, [userMobile], (err, results) => {
+      if (err) {
+        console.error('Error querying MySQL:', err);
+        res.status(500).json({ error: 'Internal server error' });
+        return;
+      }
+      res.json(results);
+    });
+  } catch (error) {
+    res.send({
+      message: "error",
+    });
+  }
+};
+
 
 module.exports = {
   displayData,
@@ -553,4 +576,5 @@ module.exports = {
   deletePending,
   singleShop,
   mobileNumberCheck,
+  postList
 };
