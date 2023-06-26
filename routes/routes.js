@@ -32,4 +32,5 @@ router.delete('/pendingDelete/:id', controller.deletePending)
 router.post('/adminSignup', controller.adminRegistration)
 router.post('/admin', controller.adminLogin)
 router.post('/mobileCheck', controller.mobileNumberCheck)
+router.post('/allPost', controller.postList)
 module.exports = router;
