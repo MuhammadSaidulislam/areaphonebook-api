@@ -181,20 +181,21 @@ const createShop = async (req, res, next) => {
 const createCategory = async (req, res, next) => {
   try {
     var db = req.db;
-    const { categoryName } = req.body;
-    if (!categoryName) {
-      res.status(400).json({ error: "Category name is required" });
-      return;
-    }
-    // Insert the category into the database
-    const query = `INSERT INTO category (categoryName) VALUES ('${categoryName}')`;
-    db.query(query, (err, result) => {
+    var data = {
+      categoryName: red.body.categoryName,
+      category_image: req.file.filename,
+    };
+    console.log("image", data);
+    db.query("Insert into category set ? ", [data], function (err, rows) {
       if (err) {
-        console.error("Error creating category: ", err);
-        res.status(500).json({ error: "Error creating category" });
-        return;
+        res.send({
+          message: "error",
+        });
+      } else {
+        res.send({
+          message: "Success",
+        });
       }
-      res.status(200).json({ message: "Category created successfully" });
     });
   } catch (error) {
     res.send({
@@ -405,7 +406,7 @@ const userProfile = async (req, res, next) => {
   try {
     var db = req.db;
     const { userMobile } = req.body;
-    const query = "SELECT * FROM shop WHERE mobile = ?";
+    const query = "SELECT * FROM shop WHERE mobile = ? AND post_id = ''";
     db.query(query, userMobile, (err, results) => {
       if (err) {
         console.error("Error fetching subcategory:", err);
@@ -444,7 +445,7 @@ const pendingShop = async (req, res, next) => {
       service: req.body.shop.service,
       // image: req.file.filename,
     };
-    let result = await db.query(
+     db.query(
       "Insert into pending_shop set ? ",
       [data],
       function (err, rows) {
@@ -543,8 +544,8 @@ const postList = async (req, res, next) => {
     const query = `SELECT * FROM shop WHERE mobile = ? AND post_id != ''`;
     db.query(query, [userMobile], (err, results) => {
       if (err) {
-        console.error('Error querying MySQL:', err);
-        res.status(500).json({ error: 'Internal server error' });
+        console.error("Error querying MySQL:", err);
+        res.status(500).json({ error: "Internal server error" });
         return;
       }
       res.json(results);
@@ -555,8 +556,77 @@ const postList = async (req, res, next) => {
     });
   }
 };
+// report add
+const reportAdd = async (req, res, next) => {
+  try {
+    var db = req.db;
 
+    var data = {
+      name: req.body.name,
+      complain: req.body.complain,
+    };
+    console.log("report", req.body);
+    // Insert the subcategory into the database
+    const query = `INSERT INTO report SET ?`;
+    db.query(query,[data], (err, result) => {
+      if (err) {
+        console.error("Error creating subcategory: ", err);
+        res.status(500).json({ error: "Error creating report" });
+        return;
+      }
+      res.status(200).json({ message: "report send successfully" });
+    });
+  } catch (error) {
+    res.send({
+      message: "error",
+    });
+  }
+};
+// report list
+const reportList = async (req, res, next) => {
+  try {
+    var db = req.db;
+    db.query(
+      "Select * from report",
+      function (error, rows) {
+        if (error) {
+          console.log("Error db");
+        } else {
+          res.send({
+            status: 1,
+            message: "successfully get report list",
+            data: rows,
+          });
+        }
+      }
+    );
+  } catch (error) {
+    res.send({
+      message: "error",
+    });
+  }
+};
+// delete shop
+const deleteShop = async (req, res, next) => {
+  const shopId = req.params.id;
+  var db = req.db;
+  try {
+    const deleteQuery = "DELETE FROM shop WHERE shop_id = ?";
+    db.query(deleteQuery, [shopId], (err, result) => {
+      if (err) {
+        console.error("Error deleting data from the database: ", err);
+        res.status(500).send("Error deleting data.");
+        return;
+      }
 
+      console.log("Data deleted successfully.");
+      res.sendStatus(200);
+    });
+  } catch (err) {
+    console.error("Error deleting data: ", err);
+    res.status(500).send("Error deleting data.");
+  }
+};
 module.exports = {
   displayData,
   createShop,
@@ -576,5 +646,8 @@ module.exports = {
   deletePending,
   singleShop,
   mobileNumberCheck,
-  postList
+  postList,
+  reportAdd,
+  reportList,
+  deleteShop
 };
