@@ -26,6 +26,7 @@ router.post('/AllShopList', controller.shopList)
 router.post('/singleShopShow/:id', controller.singleShop)
 router.get('/showAll', controller.displayData);
 router.post('/create', controller.createShop);
+router.put('/update/:id', controller.updateShop);
 router.post('/pendingShop', controller.pendingShop);
 router.get('/pending', controller.pendingList)
 router.delete('/pendingDelete/:id', controller.deletePending)
@@ -36,4 +37,6 @@ router.post('/allPost', controller.postList)
 router.post('/addReport', controller.reportAdd)
 router.get('/allReport', controller.reportList)
 router.delete('/shopDelete/:id', controller.deleteShop)
+
+router.get('/listCard', controller.dashboardList)
 module.exports = router;

@@ -142,21 +142,8 @@ const displayData = async (req, res, next) => {
 const createShop = async (req, res, next) => {
   try {
     var db = req.db;
-    var data = {
-      shop_id: req.body.shop.shop_id,
-      post_id: req.body.shop.post_id,
-      mobile: req.body.shop.mobile,
-      shop_owner: req.body.shop.shop_owner,
-      shop_name: req.body.shop.shop_name,
-      category: req.body.shop.category,
-      sub_category: req.body.shop.sub_category,
-      email: req.body.shop.email,
-      ward: req.body.shop.ward,
-      address: req.body.shop.address,
-      service: req.body.shop.service,
-      // image: req.file.filename,
-    };
-    let result = await db.query(
+    var data= req.body;
+     db.query(
       "Insert into shop set ? ",
       [data],
       function (err, rows) {
@@ -177,14 +164,41 @@ const createShop = async (req, res, next) => {
     });
   }
 };
+// shop update
+const updateShop = async (req, res, next) => {
+  try {
+    const db = req.db;
+    const shopId = req.params.id;
+    const data = req.body;
+
+    db.query('UPDATE shop SET ? WHERE shop_id = ?', [data, shopId], function (err, rows) {
+      if (err) {
+        console.error('Error updating shop:', err);
+        res.status(500).send({ message: 'Error updating shop' });
+        return;
+      }
+
+      if (rows.affectedRows === 0) {
+        res.status(404).send({ message: 'Shop not found' });
+      } else {
+        res.status(200).send({ message: 'Shop updated successfully' });
+      }
+    });
+  } catch (error) {
+    console.error('Error updating shop:', error);
+    res.status(500).send({ message: 'Error updating shop' });
+  }
+};
 // category
 const createCategory = async (req, res, next) => {
   try {
     var db = req.db;
+    console.log('req',red.body,req.file.filename);
     var data = {
-      categoryName: red.body.categoryName,
-      category_image: req.file.filename,
+      category_name: red.body.category_name,
+      image: req.file.filename,
     };
+    const filename = req.file.filename;
     console.log("image", data);
     db.query("Insert into category set ? ", [data], function (err, rows) {
       if (err) {
@@ -255,10 +269,10 @@ const allSubcategoryList = async (req, res, next) => {
 const createSubCategory = async (req, res, next) => {
   try {
     var db = req.db;
-    const { categoryName, subCategoryName } = req.body;
+    const { categoryName, subCategoryName,tags } = req.body;
 
     // Insert the subcategory into the database
-    const query = `INSERT INTO subcategory (category_name, sub_category_name) VALUES ('${categoryName}', '${subCategoryName}')`;
+    const query = `INSERT INTO subcategory (category_name, sub_category_name, tags) VALUES ('${categoryName}', '${subCategoryName}', '${tags}')`;
     db.query(query, (err, result) => {
       if (err) {
         console.error("Error creating subcategory: ", err);
@@ -431,20 +445,7 @@ const userProfile = async (req, res, next) => {
 const pendingShop = async (req, res, next) => {
   try {
     var db = req.db;
-    var data = {
-      shop_id: req.body.shop.shop_id,
-      post_id: req.body.shop.post_id,
-      mobile: req.body.shop.mobile,
-      shop_owner: req.body.shop.shop_owner,
-      shop_name: req.body.shop.shop_name,
-      category: req.body.shop.category,
-      sub_category: req.body.shop.sub_category,
-      email: req.body.shop.email,
-      ward: req.body.shop.ward,
-      address: req.body.shop.address,
-      service: req.body.shop.service,
-      // image: req.file.filename,
-    };
+    var data =req.body;
      db.query(
       "Insert into pending_shop set ? ",
       [data],
@@ -565,7 +566,6 @@ const reportAdd = async (req, res, next) => {
       name: req.body.name,
       complain: req.body.complain,
     };
-    console.log("report", req.body);
     // Insert the subcategory into the database
     const query = `INSERT INTO report SET ?`;
     db.query(query,[data], (err, result) => {
@@ -627,6 +627,58 @@ const deleteShop = async (req, res, next) => {
     res.status(500).send("Error deleting data.");
   }
 };
+// home page list
+const dashboardList= async (req, res, next) => {
+  var db = req.db;
+  const query = `SELECT categoryName, category_image FROM category`;
+
+  db.query(query, (err, results) => {
+    if (err) throw err;
+
+    const categories = results.map((result) => {
+      return {
+        categoryName: result.categoryName,
+        categoryImage: result.category_image || "",
+        subCategory: []
+      };
+    });
+
+    const subQuery = `SELECT category_name, sub_category_name, tags FROM subcategory`;
+
+    db.query(subQuery, (err, subResults) => {
+      if (err) throw err;
+
+      subResults.forEach((subResult) => {
+        const categoryIndex = categories.findIndex((category) => category.categoryName === subResult.category_name);
+
+        if (categoryIndex !== -1) {
+          categories[categoryIndex].subCategory.push({
+            category_name: subResult.category_name,
+            sub_category_name: subResult.sub_category_name,
+            tags: subResult.tags || ""
+          });
+        }
+      });
+
+      res.json(categories);
+    });
+  });
+}
+const example= async (req, res, next) => {
+  var db = req.db;
+  const { categoryName } = req.body;
+  const category_image = req.file.filename;
+
+  const query = 'INSERT INTO category (categoryName, category_image) VALUES (?, ?)';
+  db.query(query, [categoryName, category_image], (err, result) => {
+    if (err) {
+      console.error('Error saving user:', err);
+      res.status(500).json({ error: 'Failed to save user' });
+    } else {
+      res.json({ message: 'User saved successfully' });
+    }
+  });
+}
 module.exports = {
   displayData,
   createShop,
@@ -649,5 +701,8 @@ module.exports = {
   postList,
   reportAdd,
   reportList,
-  deleteShop
+  deleteShop,
+  updateShop,
+  dashboardList,
+  example
 };
