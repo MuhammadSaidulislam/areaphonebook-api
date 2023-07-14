@@ -780,6 +780,31 @@ const showTags = async (req, res, next) => {
     res.json({ tags: tagsArray });
   });
 }
+// filter tags list
+// all category list
+const allFilter = async (req, res, next) => {
+  try {
+    var db = req.db;
+    let results = await db.query(
+      "Select * from filter_tags",
+      function (error, rows) {
+        if (error) {
+          console.log("Error db");
+        } else {
+          res.send({
+            status: 1,
+            message: "successfully get list",
+            data: rows,
+          });
+        }
+      }
+    );
+  } catch (error) {
+    res.send({
+      message: "error",
+    });
+  }
+};
 
 
 module.exports = {
@@ -809,5 +834,6 @@ module.exports = {
   dashboardList,
   createTags,
   showTags,
-  deleteCategory
+  deleteCategory,
+  allFilter
 };
