@@ -13,21 +13,25 @@ const storage = multer.diskStorage({
 const upload=multer({
     storage:storage
 })
+
+
+// Multer middleware
+// app.use(upload.single('fieldname'));
 // routes api
 router.post('/userCreate', controller.registration)
 router.post('/login', controller.userLogin)
 router.post('/userDashboard', controller.userProfile)
-router.post('/category', upload.single('image'), controller.createCategory)
+router.post('/category', upload.single('category_image'), controller.createCategory)
 router.get('/categoryList', controller.categoryList)
 router.get('/allSubcategoryList', controller.allSubcategoryList)
-router.post('/subcategory', controller.createSubCategory)
+router.post('/subcategory',upload.single('sub_category_image'), controller.createSubCategory)
 router.post('/subcategorylist', controller.getSubCategory)
 router.post('/AllShopList', controller.shopList)
 router.post('/singleShopShow/:id', controller.singleShop)
 router.get('/showAll', controller.displayData);
 router.post('/create', controller.createShop);
 router.put('/update/:id', controller.updateShop);
-router.post('/pendingShop', controller.pendingShop);
+router.post('/pendingShop',upload.single('shop_image'), controller.pendingShop);
 router.get('/pending', controller.pendingList)
 router.delete('/pendingDelete/:id', controller.deletePending)
 router.post('/adminSignup', controller.adminRegistration)
@@ -39,4 +43,10 @@ router.get('/allReport', controller.reportList)
 router.delete('/shopDelete/:id', controller.deleteShop)
 
 router.get('/listCard', controller.dashboardList)
+router.post('/filterAdd', controller.createTags)
+router.post('/filterList', controller.showTags)
+router.delete('/categoryDelete/:category_name', controller.deleteCategory)
+
+
+
 module.exports = router;

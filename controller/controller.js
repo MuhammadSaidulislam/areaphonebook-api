@@ -142,9 +142,64 @@ const displayData = async (req, res, next) => {
 const createShop = async (req, res, next) => {
   try {
     var db = req.db;
-    var data= req.body;
-     db.query(
-      "Insert into shop set ? ",
+    var data = req.body;
+    db.query("Insert into shop set ? ", [data], function (err, rows) {
+      if (err) {
+        res.send({
+          message: "error",
+        });
+      } else {
+        res.send({
+          message: "Success",
+        });
+      }
+    });
+  } catch (error) {
+    res.send({
+      message: "error",
+    });
+  }
+};
+// shop update
+const updateShop = async (req, res, next) => {
+  try {
+    const db = req.db;
+    const shopId = req.params.id;
+    const data = req.body;
+
+    db.query(
+      "UPDATE shop SET ? WHERE shop_id = ?",
+      [data, shopId],
+      function (err, rows) {
+        if (err) {
+          console.error("Error updating shop:", err);
+          res.status(500).send({ message: "Error updating shop" });
+          return;
+        }
+
+        if (rows.affectedRows === 0) {
+          res.status(404).send({ message: "Shop not found" });
+        } else {
+          res.status(200).send({ message: "Shop updated successfully" });
+        }
+      }
+    );
+  } catch (error) {
+    console.error("Error updating shop:", error);
+    res.status(500).send({ message: "Error updating shop" });
+  }
+};
+// category
+const createCategory = async (req, res, next) => {
+  try {
+    var db = req.db;
+    var data = {
+      category_name: req.body.category_name,
+      category_image: req.file.filename,
+    };
+
+    db.query(
+      "Insert into category set ? ",
       [data],
       function (err, rows) {
         if (err) {
@@ -164,59 +219,29 @@ const createShop = async (req, res, next) => {
     });
   }
 };
-// shop update
-const updateShop = async (req, res, next) => {
-  try {
-    const db = req.db;
-    const shopId = req.params.id;
-    const data = req.body;
+// delete category
+const deleteCategory = async (req, res, next) => {
+  var db = req.db;
+  const category_name = req.params.category_name;
 
-    db.query('UPDATE shop SET ? WHERE shop_id = ?', [data, shopId], function (err, rows) {
-      if (err) {
-        console.error('Error updating shop:', err);
-        res.status(500).send({ message: 'Error updating shop' });
-        return;
-      }
+  const query = 'DELETE FROM category WHERE category_name = ?';
 
-      if (rows.affectedRows === 0) {
-        res.status(404).send({ message: 'Shop not found' });
-      } else {
-        res.status(200).send({ message: 'Shop updated successfully' });
-      }
-    });
-  } catch (error) {
-    console.error('Error updating shop:', error);
-    res.status(500).send({ message: 'Error updating shop' });
-  }
-};
-// category
-const createCategory = async (req, res, next) => {
-  try {
-    var db = req.db;
-    console.log('req',red.body,req.file.filename);
-    var data = {
-      category_name: red.body.category_name,
-      image: req.file.filename,
-    };
-    const filename = req.file.filename;
-    console.log("image", data);
-    db.query("Insert into category set ? ", [data], function (err, rows) {
-      if (err) {
-        res.send({
-          message: "error",
-        });
-      } else {
-        res.send({
-          message: "Success",
-        });
-      }
-    });
-  } catch (error) {
-    res.send({
-      message: "error",
-    });
-  }
-};
+  db.query(query, [category_name], (error, result) => {
+    if (error) {
+      console.error('Error deleting category:', error);
+      res.status(500).json({ error: 'Error deleting category' });
+      return;
+    }
+
+    if (result.affectedRows === 0) {
+      res.status(404).json({ error: 'Category not found' });
+      return;
+    }
+
+    res.json({ message: 'Category deleted successfully' });
+  });
+}
+
 // category list
 const categoryList = async (req, res, next) => {
   try {
@@ -269,18 +294,27 @@ const allSubcategoryList = async (req, res, next) => {
 const createSubCategory = async (req, res, next) => {
   try {
     var db = req.db;
-    const { categoryName, subCategoryName,tags } = req.body;
+    var data = {
+      category_name: req.body.category_name,
+      sub_category_name: req.body.sub_category_name,
+      sub_category_image: req.file.filename,
+    };
 
-    // Insert the subcategory into the database
-    const query = `INSERT INTO subcategory (category_name, sub_category_name, tags) VALUES ('${categoryName}', '${subCategoryName}', '${tags}')`;
-    db.query(query, (err, result) => {
-      if (err) {
-        console.error("Error creating subcategory: ", err);
-        res.status(500).json({ error: "Error creating subcategory" });
-        return;
+    db.query(
+      "Insert into subcategory set ? ",
+      [data],
+      function (err, rows) {
+        if (err) {
+          res.send({
+            message: "error",
+          });
+        } else {
+          res.send({
+            message: "Success",
+          });
+        }
       }
-      res.status(200).json({ message: "Subcategory created successfully" });
-    });
+    );
   } catch (error) {
     res.send({
       message: "error",
@@ -292,10 +326,10 @@ const getSubCategory = async (req, res, next) => {
   try {
     var db = req.db;
     // const category_Id = req.params.categoryId;
-    const { categoryName } = req.body;
+    const { category_name } = req.body;
     // Fetch subcategories under the specified category
     const query = "SELECT * FROM subcategory WHERE category_name = ?";
-    db.query(query, [categoryName], (err, results) => {
+    db.query(query, [category_name], (err, results) => {
       if (err) {
         console.error("Error fetching subcategory:", err);
         return;
@@ -314,11 +348,11 @@ const shopList = async (req, res, next) => {
   try {
     var db = req.db;
     // const category_Id = req.params.categoryId;
-    const { subCategoryName } = req.body;
+    const { subcategory_name } = req.body;
 
     // Fetch subcategories under the specified category
     const query = "SELECT * FROM shop WHERE sub_category = ?";
-    db.query(query, [subCategoryName], (err, results) => {
+    db.query(query, [subcategory_name], (err, results) => {
       if (err) {
         console.error("Error fetching subcategory:", err);
         return;
@@ -445,22 +479,29 @@ const userProfile = async (req, res, next) => {
 const pendingShop = async (req, res, next) => {
   try {
     var db = req.db;
-    var data =req.body;
-     db.query(
-      "Insert into pending_shop set ? ",
-      [data],
-      function (err, rows) {
-        if (err) {
-          res.send({
-            message: "error",
-          });
-        } else {
-          res.send({
-            message: "Success",
-          });
-        }
+    var data = {
+      shop_image: req.file.filename,
+      category: req.body.category,
+      sub_category: req.body.sub_category,
+      shop_owner: req.body.shop_owner,
+      shop_name: req.body.shop_name,
+      email: req.body.email,
+      address: req.body.address,
+      service: req.body.service,
+      shop_id: req.body.shop_id,
+      post_id: req.body.post_id,
+      mobile: req.body.mobile,
+      tags: req.body.tags,
+    };
+    db.query("Insert into pending_shop set ? ", [data], function (err, rows) {
+      if (err) {
+        res.send(console.log(err));
+      } else {
+        res.send({
+          message: "Success",
+        });
       }
-    );
+    });
   } catch (error) {
     res.send({
       message: "error",
@@ -491,6 +532,7 @@ const pendingList = async (req, res, next) => {
     });
   }
 };
+// delete pending list
 const deletePending = async (req, res, next) => {
   const shopId = req.params.id;
   var db = req.db;
@@ -502,8 +544,6 @@ const deletePending = async (req, res, next) => {
         res.status(500).send("Error deleting data.");
         return;
       }
-
-      console.log("Data deleted successfully.");
       res.sendStatus(200);
     });
   } catch (err) {
@@ -568,7 +608,7 @@ const reportAdd = async (req, res, next) => {
     };
     // Insert the subcategory into the database
     const query = `INSERT INTO report SET ?`;
-    db.query(query,[data], (err, result) => {
+    db.query(query, [data], (err, result) => {
       if (err) {
         console.error("Error creating subcategory: ", err);
         res.status(500).json({ error: "Error creating report" });
@@ -586,20 +626,17 @@ const reportAdd = async (req, res, next) => {
 const reportList = async (req, res, next) => {
   try {
     var db = req.db;
-    db.query(
-      "Select * from report",
-      function (error, rows) {
-        if (error) {
-          console.log("Error db");
-        } else {
-          res.send({
-            status: 1,
-            message: "successfully get report list",
-            data: rows,
-          });
-        }
+    db.query("Select * from report", function (error, rows) {
+      if (error) {
+        console.log("Error db");
+      } else {
+        res.send({
+          status: 1,
+          message: "successfully get report list",
+          data: rows,
+        });
       }
-    );
+    });
   } catch (error) {
     res.send({
       message: "error",
@@ -628,34 +665,36 @@ const deleteShop = async (req, res, next) => {
   }
 };
 // home page list
-const dashboardList= async (req, res, next) => {
+const dashboardList = async (req, res, next) => {
   var db = req.db;
-  const query = `SELECT categoryName, category_image FROM category`;
+  const query = `SELECT category_name, category_image FROM category`;
 
   db.query(query, (err, results) => {
     if (err) throw err;
 
     const categories = results.map((result) => {
       return {
-        categoryName: result.categoryName,
+        category_name: result.category_name,
         categoryImage: result.category_image || "",
-        subCategory: []
+        subCategory: [],
       };
     });
 
-    const subQuery = `SELECT category_name, sub_category_name, tags FROM subcategory`;
+    const subQuery = `SELECT category_name, sub_category_name, sub_category_image FROM subcategory`;
 
     db.query(subQuery, (err, subResults) => {
       if (err) throw err;
 
       subResults.forEach((subResult) => {
-        const categoryIndex = categories.findIndex((category) => category.categoryName === subResult.category_name);
+        const categoryIndex = categories.findIndex(
+          (category) => category.category_name === subResult.category_name
+        );
 
         if (categoryIndex !== -1) {
           categories[categoryIndex].subCategory.push({
             category_name: subResult.category_name,
             sub_category_name: subResult.sub_category_name,
-            tags: subResult.tags || ""
+            sub_category_image: subResult.sub_category_image || "",
           });
         }
       });
@@ -663,22 +702,86 @@ const dashboardList= async (req, res, next) => {
       res.json(categories);
     });
   });
-}
-const example= async (req, res, next) => {
+};
+// create filter data
+const createTags = async (req, res, next) => {
   var db = req.db;
-  const { categoryName } = req.body;
-  const category_image = req.file.filename;
+  const { category_name, sub_category_name, tags } = req.body;
 
-  const query = 'INSERT INTO category (categoryName, category_image) VALUES (?, ?)';
-  db.query(query, [categoryName, category_image], (err, result) => {
-    if (err) {
-      console.error('Error saving user:', err);
-      res.status(500).json({ error: 'Failed to save user' });
+  // Perform validation if required (e.g., check for required fields)
+
+  const selectQuery = 'SELECT * FROM filter_tags WHERE category_name = ? AND sub_category_name = ?';
+  const selectValues = [category_name, sub_category_name];
+
+  db.query(selectQuery, selectValues, (error, results) => {
+    if (error) {
+      console.error('Error checking existing data:', error);
+      res.status(500).json({ error: 'Error checking existing data' });
+      return;
+    }
+
+    if (results.length === 0) {
+      // If the category and sub-category combination does not exist, insert a new record.
+      const insertQuery = 'INSERT INTO filter_tags (category_name, sub_category_name, tags) VALUES (?, ?, ?)';
+      const insertValues = [category_name, sub_category_name, JSON.stringify([tags])];
+
+      db.query(insertQuery, insertValues, (error, result) => {
+        if (error) {
+          console.error('Error inserting data:', error);
+          res.status(500).json({ error: 'Error inserting data' });
+          return;
+        }
+
+        res.json({ message: 'Data inserted successfully' });
+      });
     } else {
-      res.json({ message: 'User saved successfully' });
+      // If the category and sub-category combination already exists, update the tags array.
+      const existingTags = JSON.parse(results[0].tags);
+      existingTags.push(tags);
+
+      const updateQuery = 'UPDATE filter_tags SET tags = ? WHERE category_name = ? AND sub_category_name = ?';
+      const updateValues = [JSON.stringify(existingTags), category_name, sub_category_name];
+
+      db.query(updateQuery, updateValues, (error, result) => {
+        if (error) {
+          console.error('Error updating data:', error);
+          res.status(500).json({ error: 'Error updating data' });
+          return;
+        }
+
+        res.json({ message: 'Data updated successfully' });
+      });
     }
   });
 }
+// filter data
+const showTags = async (req, res, next) => {
+  var db = req.db;
+  const { category_name, sub_category_name } = req.body;
+
+  // Perform validation if required (e.g., check for required fields)
+
+  const query = 'SELECT tags FROM filter_tags WHERE category_name = ? AND sub_category_name = ?';
+  const values = [category_name, sub_category_name];
+
+  db.query(query, values, (error, results) => {
+    if (error) {
+      console.error('Error fetching data:', error);
+      res.status(500).json({ error: 'Error fetching data' });
+      return;
+    }
+
+    if (results.length === 0) {
+      res.status(404).json({ error: 'Category or sub-category not found' });
+      return;
+    }
+
+    const tagsArray = JSON.parse(results[0].tags);
+    res.json({ tags: tagsArray });
+  });
+}
+
+
 module.exports = {
   displayData,
   createShop,
@@ -704,5 +807,7 @@ module.exports = {
   deleteShop,
   updateShop,
   dashboardList,
-  example
+  createTags,
+  showTags,
+  deleteCategory
 };
