@@ -46,7 +46,7 @@ router.get('/listCard', controller.dashboardList)
 router.post('/filterAdd', controller.createTags)
 router.post('/filterList', controller.showTags)
 router.delete('/categoryDelete/:category_name', controller.deleteCategory)
-
+router.get('/allFilter', controller.allFilter)
 
 
 module.exports = router;
