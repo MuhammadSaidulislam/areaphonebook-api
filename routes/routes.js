@@ -10,8 +10,8 @@ const storage = multer.diskStorage({
         return cb(null, `${file.originalname}`)
     }
 });
-const upload=multer({
-    storage:storage
+const upload = multer({
+    storage: storage
 })
 
 
@@ -24,14 +24,14 @@ router.post('/userDashboard', controller.userProfile)
 router.post('/category', upload.single('category_image'), controller.createCategory)
 router.get('/categoryList', controller.categoryList)
 router.get('/allSubcategoryList', controller.allSubcategoryList)
-router.post('/subcategory',upload.single('sub_category_image'), controller.createSubCategory)
+router.post('/subcategory', upload.single('sub_category_image'), controller.createSubCategory)
 router.post('/subcategorylist', controller.getSubCategory)
 router.post('/AllShopList', controller.shopList)
 router.post('/singleShopShow/:id', controller.singleShop)
 router.get('/showAll', controller.displayData);
 router.post('/create', controller.createShop);
 router.put('/update/:id', controller.updateShop);
-router.post('/pendingShop',upload.single('shop_image'), controller.pendingShop);
+router.post('/pendingShop', upload.single('shop_image'), controller.pendingShop);
 router.get('/pending', controller.pendingList)
 router.delete('/pendingDelete/:id', controller.deletePending)
 router.post('/adminSignup', controller.adminRegistration)
@@ -47,6 +47,8 @@ router.post('/filterAdd', controller.createTags)
 router.post('/filterList', controller.showTags)
 router.delete('/categoryDelete/:category_name', controller.deleteCategory)
 router.get('/allFilter', controller.allFilter)
-
-
+router.get('/singleCategory/:id', controller.singleCategory)
+router.put('/categoryUpdate/:id',upload.single('category_image'), controller.categoryUpdate)
+router.delete('/subcategoryDelete/:subcategory_name', controller.deleteSubCategory)
+router.delete('/filterTagDelete/:filter_id/:tag_name', controller.filterTagDelete)
 module.exports = router;
