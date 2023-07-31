@@ -456,61 +456,151 @@ const adminLogin = async (req, res, next) => {
 // user profile
 const userProfile = async (req, res, next) => {
   try {
-    var db = req.db;
+    const db = req.db;
     const { userMobile } = req.body;
-    const query = "SELECT * FROM shop WHERE mobile = ? AND post_id = ''";
-    db.query(query, userMobile, (err, results) => {
-      if (err) {
-        console.error("Error fetching subcategory:", err);
+
+    // Query to fetch data from the shop table
+    const shopQuery = `
+      SELECT *
+      FROM shop
+      WHERE mobile = ? AND post_id = ''
+    `;
+    db.query(shopQuery, userMobile, (shopErr, shopResults) => {
+      if (shopErr) {
+        console.error("Error fetching user profile:", shopErr);
+        res.status(500).json({ error: "Error fetching user profile" });
         return;
       }
 
-      if (results.length > 0) {
-        res.status(401).json(results);
-      } else {
+      if (shopResults.length === 0) {
         res.status(404).json({
           message: "User does not exist",
         });
+        return;
       }
+
+      const shopIds = shopResults.map((shop) => shop.shop_id);
+
+      // Query to fetch time data from the shop_time table using shop_id
+      const shopTimeQuery = `
+        SELECT *
+        FROM shop_time
+        WHERE shop_id IN (?)
+      `;
+      db.query(shopTimeQuery, [shopIds], (timeErr, timeResults) => {
+        if (timeErr) {
+          console.error("Error fetching shop_time data:", timeErr);
+          res.status(500).json({ error: "Error fetching shop_time data" });
+          return;
+        }
+
+        // Merge the shop and shop_time data based on shop_id
+        const userProfileData = shopResults.map((shop) => {
+          const shopTimeData = timeResults.filter((time) => time.shop_id === shop.shop_id);
+          return {
+            ...shop,
+            shop_time: shopTimeData,
+          };
+        });
+
+        res.status(200).json(userProfileData);
+      });
     });
   } catch (error) {
-    res.send({
-      message: "error",
-    });
+    console.error("Error in userProfile:", error);
+    res.status(500).json({ error: "Error in userProfile" });
   }
 };
 // create pending shop
 const pendingShop = async (req, res, next) => {
-  try {
-    var db = req.db;
-    var data = {
-      shop_image: req.file.filename,
-      category: req.body.category,
-      sub_category: req.body.sub_category,
-      shop_owner: req.body.shop_owner,
-      shop_name: req.body.shop_name,
-      email: req.body.email,
-      address: req.body.address,
-      service: req.body.service,
-      shop_id: req.body.shop_id,
-      post_id: req.body.post_id,
-      mobile: req.body.mobile,
-      tags: req.body.tags,
-    };
-    db.query("Insert into pending_shop set ? ", [data], function (err, rows) {
-      if (err) {
-        res.send(console.log(err));
-      } else {
-        res.send({
-          message: "Success",
-        });
+  var db = req.db;
+
+  const { weeklyDays } = req.body;
+  const {shop_id}= req.body;
+  var data = {
+    shop_image: req.file.filename,
+    category: req.body.category,
+    sub_category: req.body.sub_category,
+    title: req.body.title,
+    number: req.body.number,
+    address: req.body.address,
+    service: req.body.service,
+    shop_id: req.body.shop_id,
+    post_id: req.body.post_id,
+    mobile: req.body.mobile,
+    tags: req.body.tags,
+    phone_show: req.body.phone_show
+  };
+  const weeklyDaysData = JSON.parse(weeklyDays);
+
+  db.beginTransaction((err) => {
+    if (err) {
+      console.error('Error starting transaction:', err);
+      return res.status(500).json({ error: 'Error starting transaction' });
+    }
+    // Insert data into the "pending" table
+    db.query(
+      "Insert into pending_shop set ? ",
+      [data],
+      (err, result) => {
+        if (err) {
+          console.log('err', err);
+          // Rollback the transaction if there's an error
+          db.rollback(() => {
+            res.status(500).json({ error: 'Error inserting data into pending table' });
+          });
+        } else {
+          // Check if there is any data in weeklyDaysData
+          if (Array.isArray(weeklyDaysData) && weeklyDaysData.length > 0) {
+            // Insert the "shop_time" data in a loop
+            const insertShopTimeQuery = 'INSERT INTO shop_time (shop_id, day, start_time, end_time) VALUES (?, ?, ?, ?)';
+
+            weeklyDaysData.forEach((dayData, index) => {
+              const { day, start_time, end_time } = dayData;
+              db.query(
+                insertShopTimeQuery,
+                [shop_id, day, start_time, end_time],
+                (err, result) => {
+                  if (err) {
+                    // Rollback the transaction if there's an error
+                    db.rollback(() => {
+                      res.status(500).json({ error: `Error inserting data for ${day} in shop_time table` });
+                    });
+                  } else {
+                    // If all "shop_time" data is inserted successfully, commit the transaction
+                    if (index === weeklyDaysData.length - 1) {
+                      db.commit((err) => {
+                        if (err) {
+                          // Rollback the transaction if there's an error
+                          db.rollback(() => {
+                            res.status(500).json({ error: 'Error committing transaction' });
+                          });
+                        } else {
+                          res.status(200).json({ message: 'Form submitted successfully' });
+                        }
+                      });
+                    }
+                  }
+                }
+              );
+            });
+          } else {
+            // If no shop_time data is provided, directly commit the transaction
+            db.commit((err) => {
+              if (err) {
+                // Rollback the transaction if there's an error
+                db.rollback(() => {
+                  res.status(500).json({ error: 'Error committing transaction' });
+                });
+              } else {
+                res.status(200).json({ message: 'Form submitted successfully' });
+              }
+            });
+          }
+        }
       }
-    });
-  } catch (error) {
-    res.send({
-      message: "error",
-    });
-  }
+    );
+  });
 };
 // category list
 const pendingList = async (req, res, next) => {
@@ -858,7 +948,7 @@ const categoryUpdate = async (req, res, next) => {
     }
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ status: 404,error: 'Category not found.' });
+      return res.status(404).json({ status: 404, error: 'Category not found.' });
     }
 
     res.json({ message: 'Category updated successfully.' });
