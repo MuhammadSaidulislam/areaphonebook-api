@@ -529,7 +529,8 @@ const pendingShop = async (req, res, next) => {
     post_id: req.body.post_id,
     mobile: req.body.mobile,
     tags: req.body.tags,
-    phone_show: req.body.phone_show
+    phone_show: req.body.phone_show,
+    related_shop: req.body.related_shop
   };
   const weeklyDaysData = JSON.parse(weeklyDays);
 
@@ -1012,7 +1013,51 @@ const filterTagDelete = async (req, res, next) => {
     });
   });
 }
+// related shop
+const relatedShop = async (req, res, next) => {
+  var db = req.db;
+  const shopId = req.params.id;
+  const query = 'SELECT * FROM shop WHERE related_shop = ?';
 
+  db.query(query, [shopId], (error, results) => {
+    if (error) {
+      console.error('Error executing query:', error);
+      res.status(500).json({ error: 'Error fetching data from database' });
+      return;
+    }
+
+    res.status(200).json(results);
+  });
+}
+
+// post news
+const postNews = async (req, res, next) => {
+  var db = req.db;
+  const category_name = req.params.id;
+  const query = `SELECT * FROM shop WHERE category = ?`;
+  db.query(query, [category_name], (error, results) => {
+    if (error) {
+      console.error('Error fetching data:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    } else {
+      res.json(results);
+    }
+  });
+}
+// post tags
+const postTags = async (req, res, next) => {
+  var db = req.db;
+  const category_name = req.params.id;
+  const query = `SELECT tags FROM shop WHERE category = ?`;
+  db.query(query, [category_name], (error, results) => {
+    if (error) {
+      console.error('Error fetching data:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    } else {
+      res.json(results);
+    }
+  });
+}
 
 module.exports = {
   displayData,
@@ -1046,5 +1091,8 @@ module.exports = {
   singleCategory,
   categoryUpdate,
   deleteSubCategory,
-  filterTagDelete
+  filterTagDelete,
+  relatedShop,
+  postNews,
+  postTags
 };
