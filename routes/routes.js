@@ -41,7 +41,6 @@ router.post('/allPost', controller.postList)
 router.post('/addReport', controller.reportAdd)
 router.get('/allReport', controller.reportList)
 router.delete('/shopDelete/:id', controller.deleteShop)
-
 router.get('/listCard', controller.dashboardList)
 router.post('/filterAdd', controller.createTags)
 router.post('/filterList', controller.showTags)
@@ -51,4 +50,9 @@ router.get('/singleCategory/:id', controller.singleCategory)
 router.put('/categoryUpdate/:id',upload.single('category_image'), controller.categoryUpdate)
 router.delete('/subcategoryDelete/:subcategory_name', controller.deleteSubCategory)
 router.delete('/filterTagDelete/:filter_id/:tag_name', controller.filterTagDelete)
+router.get('/related_shop/:id', controller.relatedShop)
+router.get('/newsFeed/:id', controller.postNews)
+router.get('/postTags/:id', controller.postTags)
+
+
 module.exports = router;
