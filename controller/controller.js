@@ -355,7 +355,7 @@ const shopList = async (req, res, next) => {
     const { subcategory_name } = req.body;
 
     // Fetch subcategories under the specified category
-    const query = "SELECT * FROM shop WHERE sub_category = ?";
+    const query = "SELECT * FROM shop WHERE sub_category = ? AND post_id = ''";
     db.query(query, [subcategory_name], (err, results) => {
       if (err) {
         console.error("Error fetching subcategory:", err);
@@ -516,7 +516,7 @@ const pendingShop = async (req, res, next) => {
   var db = req.db;
 
   const { weeklyDays } = req.body;
-  const {shop_id}= req.body;
+  const { shop_id } = req.body;
   var data = {
     shop_image: req.file.filename,
     category: req.body.category,
@@ -1033,9 +1033,8 @@ const relatedShop = async (req, res, next) => {
 // post news
 const postNews = async (req, res, next) => {
   var db = req.db;
-  const category_name = req.params.id;
-  const query = `SELECT * FROM shop WHERE category = ?`;
-  db.query(query, [category_name], (error, results) => {
+  const query = 'SELECT * FROM shop WHERE LENGTH(post_id) > 0';
+  db.query(query, (error, results) => {
     if (error) {
       console.error('Error fetching data:', error);
       res.status(500).json({ error: 'Internal server error' });
@@ -1049,6 +1048,7 @@ const postTags = async (req, res, next) => {
   var db = req.db;
   const category_name = req.params.id;
   const query = `SELECT tags FROM shop WHERE category = ?`;
+
   db.query(query, [category_name], (error, results) => {
     if (error) {
       console.error('Error fetching data:', error);
@@ -1056,6 +1056,55 @@ const postTags = async (req, res, next) => {
     } else {
       res.json(results);
     }
+  });
+}
+
+// category post
+const categoryPost = async (req, res, next) => {
+  var db = req.db;
+  const category_name = req.params.category;
+  const query = `SELECT * FROM shop WHERE category = ? AND LENGTH(post_id) > 0`;
+  db.query(query, [category_name], (error, results) => {
+    if (error) {
+      console.error('Error fetching data:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    } else {
+      res.json(results);
+    }
+  });
+}
+
+// review add
+const reviewAdd = async (req, res, next) => {
+  try {
+    var db = req.db;
+    const { rating, user_name, review, shop_id } = req.body;
+
+    const insertQuery = `
+      INSERT INTO review (rating, user_name, review, shop_id)
+      VALUES (?, ?, ?, ?)
+    `;
+
+    await db.query(insertQuery, [rating, user_name, review, shop_id]);
+
+    res.json({ message: 'Review added successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'An error occurred while adding the review' });
+  }
+}
+// get shop wise review
+const getReview = async (req, res, next) => {
+  var db = req.db;
+  const shopId = req.params.id;
+  const query = `SELECT * FROM review WHERE shop_id = ?`;
+  db.query(query, [shopId], (err, results) => {
+    if (err) {
+      console.error('Error querying the database:', err);
+      res.status(500).json({ error: 'Database error' });
+      return;
+    }
+    res.json(results);
   });
 }
 
@@ -1094,5 +1143,8 @@ module.exports = {
   filterTagDelete,
   relatedShop,
   postNews,
-  postTags
+  postTags,
+  categoryPost,
+  reviewAdd,
+  getReview
 };

@@ -51,8 +51,12 @@ router.put('/categoryUpdate/:id',upload.single('category_image'), controller.cat
 router.delete('/subcategoryDelete/:subcategory_name', controller.deleteSubCategory)
 router.delete('/filterTagDelete/:filter_id/:tag_name', controller.filterTagDelete)
 router.get('/related_shop/:id', controller.relatedShop)
-router.get('/newsFeed/:id', controller.postNews)
+router.get('/newsFeed', controller.postNews)
 router.get('/postTags/:id', controller.postTags)
+router.get('/categoryPost/:category', controller.categoryPost)
+router.post('/reviewAdd', controller.reviewAdd)
+router.get('/getReview/:id', controller.getReview)
+
 
 
 module.exports = router;
