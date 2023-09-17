@@ -56,7 +56,11 @@ router.get('/postTags/:id', controller.postTags)
 router.get('/categoryPost/:category', controller.categoryPost)
 router.post('/reviewAdd', controller.reviewAdd)
 router.get('/getReview/:id', controller.getReview)
+router.post('/filterTags', controller.filterTags)
 
-
-
+// new
+router.get('/allShopList', controller.allShopList)
+router.get('/shopTime/:id', controller.shopTime)
+router.get('/tagsList', controller.tagsList)
+router.get('/filterTagsList/:tag', controller.filterTagsList)
 module.exports = router;
