@@ -350,25 +350,29 @@ const getSubCategory = async (req, res, next) => {
 // get category and subcategory
 const shopList = async (req, res, next) => {
   try {
-    var db = req.db;
-    // const category_Id = req.params.categoryId;
+    const db = req.db;
     const { subcategory_name } = req.body;
-
-    // Fetch subcategories under the specified category
     const query = "SELECT * FROM shop WHERE sub_category = ? AND post_id = ''";
+
     db.query(query, [subcategory_name], (err, results) => {
       if (err) {
         console.error("Error fetching subcategory:", err);
+        res.status(500).json({ error: "Internal server error" });
         return;
       }
-      res.status(200).json(results);
+
+      if (results.length === 0) {
+        res.status(200).json({ message: "No data" }); // Send "No data" response
+      } else {
+        res.status(200).json(results);
+      }
     });
   } catch (error) {
-    res.send({
-      message: "error",
-    });
+    res.status(500).json({ error: "Internal server error" });
   }
 };
+
+
 // admin
 // registration
 const adminRegistration = async (req, res, next) => {
@@ -420,7 +424,6 @@ const adminLogin = async (req, res, next) => {
   // Validate request body using Joi
   var db = req.db;
   const { name, password } = req.body;
-
   // Retrieve the user from the database based on the username
   db.query("SELECT * FROM admin WHERE name = ?", [name], (err, rows) => {
     if (err) {
@@ -458,7 +461,6 @@ const userProfile = async (req, res, next) => {
   try {
     const db = req.db;
     const { userMobile } = req.body;
-
     // Query to fetch data from the shop table
     const shopQuery = `
       SELECT *
@@ -494,16 +496,39 @@ const userProfile = async (req, res, next) => {
           return;
         }
 
-        // Merge the shop and shop_time data based on shop_id
-        const userProfileData = shopResults.map((shop) => {
-          const shopTimeData = timeResults.filter((time) => time.shop_id === shop.shop_id);
-          return {
-            ...shop,
-            shop_time: shopTimeData,
-          };
-        });
+        // Query to fetch average rating for each shop
+        const ratingQuery = `
+          SELECT shop_id, AVG(rating) AS average_rating
+          FROM review
+          WHERE shop_id IN (?)
+          GROUP BY shop_id
+        `;
+        db.query(ratingQuery, [shopIds], (ratingErr, ratingResults) => {
+          if (ratingErr) {
+            console.error("Error fetching average ratings:", ratingErr);
+            res.status(500).json({ error: "Error fetching average ratings" });
+            return;
+          }
 
-        res.status(200).json(userProfileData);
+          // Create a map to store average ratings by shop_id
+          const averageRatingsMap = {};
+          ratingResults.forEach((ratingRow) => {
+            averageRatingsMap[ratingRow.shop_id] = ratingRow.average_rating;
+          });
+
+          // Merge the shop, shop_time, and rating data based on shop_id
+          const userProfileData = shopResults.map((shop) => {
+            const shopTimeData = timeResults.filter((time) => time.shop_id === shop.shop_id);
+            const averageRating = averageRatingsMap[shop.shop_id] || 0; // Use 0 if no rating found
+            return {
+              ...shop,
+              shop_time: shopTimeData,
+              average_rating: averageRating,
+            };
+          });
+
+          res.status(200).json(userProfileData);
+        });
       });
     });
   } catch (error) {
@@ -514,7 +539,6 @@ const userProfile = async (req, res, next) => {
 // create pending shop
 const pendingShop = async (req, res, next) => {
   var db = req.db;
-
   const { weeklyDays } = req.body;
   const { shop_id } = req.body;
   var data = {
@@ -750,8 +774,6 @@ const deleteShop = async (req, res, next) => {
         res.status(500).send("Error deleting data.");
         return;
       }
-
-      console.log("Data deleted successfully.");
       res.sendStatus(200);
     });
   } catch (err) {
@@ -854,8 +876,6 @@ const createTags = async (req, res, next) => {
 const showTags = async (req, res, next) => {
   var db = req.db;
   const { category_name, sub_category_name } = req.body;
-
-  // Perform validation if required (e.g., check for required fields)
 
   const query = 'SELECT filter_id, tags FROM filter_tags WHERE category_name = ? AND sub_category_name = ?';
   const values = [category_name, sub_category_name];
@@ -1064,12 +1084,17 @@ const categoryPost = async (req, res, next) => {
   var db = req.db;
   const category_name = req.params.category;
   const query = `SELECT * FROM shop WHERE category = ? AND LENGTH(post_id) > 0`;
+
   db.query(query, [category_name], (error, results) => {
     if (error) {
       console.error('Error fetching data:', error);
       res.status(500).json({ error: 'Internal server error' });
     } else {
-      res.json(results);
+      if (results.length === 0) {
+        res.json({ message: 'No data' }); // Send "No data" response
+      } else {
+        res.json(results);
+      }
     }
   });
 }
@@ -1078,15 +1103,13 @@ const categoryPost = async (req, res, next) => {
 const reviewAdd = async (req, res, next) => {
   try {
     var db = req.db;
-    const { rating, user_name, review, shop_id } = req.body;
+    const { rating, user_name, review, shop_id, time_set } = req.body;
 
     const insertQuery = `
-      INSERT INTO review (rating, user_name, review, shop_id)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO review (rating, user_name, review, shop_id,time_set)
+      VALUES (?, ?, ?, ?,?)
     `;
-
-    await db.query(insertQuery, [rating, user_name, review, shop_id]);
-
+    await db.query(insertQuery, [rating, user_name, review, shop_id, time_set]);
     res.json({ message: 'Review added successfully' });
   } catch (error) {
     console.error(error);
@@ -1097,7 +1120,7 @@ const reviewAdd = async (req, res, next) => {
 const getReview = async (req, res, next) => {
   var db = req.db;
   const shopId = req.params.id;
-  const query = `SELECT * FROM review WHERE shop_id = ?`;
+  const query = `SELECT * FROM review WHERE shop_id = ? ORDER BY time_set DESC`;
   db.query(query, [shopId], (err, results) => {
     if (err) {
       console.error('Error querying the database:', err);
@@ -1105,6 +1128,121 @@ const getReview = async (req, res, next) => {
       return;
     }
     res.json(results);
+  });
+}
+
+// filter tags
+const filterTags = async (req, res, next) => {
+  try {
+    const { category, sub_category } = req.body;
+    var db = req.db;
+    const query = `
+      SELECT DISTINCT tags
+      FROM shop
+      WHERE category = ? AND sub_category = ? AND tags IS NOT NULL
+    `;
+
+    db.query(query, [category, sub_category], (err, results) => {
+      if (err) {
+        console.error('Error fetching related tags:', err);
+        res.status(500).json({ error: 'Internal server error' });
+        return;
+      }
+
+      const tags = results.map(result => result.tags); // Use 'tags' instead of 'tag'
+      res.status(200).json(tags);
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+
+// new concept
+const allShopList = async (req, res, next) => {
+  try {
+    var db = req.db;
+    const { page, pageSize } = req.query;
+    const offset = (page - 1) * pageSize;
+    // const sql = `SELECT * FROM shop LIMIT ${pageSize} OFFSET ${offset}`;
+    const sql = `
+   SELECT s.*, COALESCE(AVG(r.rating), 0) AS average_rating
+   FROM shop s
+   LEFT JOIN review r ON s.shop_id = r.shop_id
+   GROUP BY s.shop_id
+   LIMIT ${pageSize} OFFSET ${offset}
+ `;
+    db.query(sql, (err, result) => {
+      if (err) {
+        console.error(err);
+        res.status(500).send('Error retrieving data');
+      } else {
+        res.json(result);
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+// shop time
+const shopTime = async (req, res, next) => {
+  var db = req.db;
+  const shopId = req.params.id;
+  const query = 'SELECT * FROM shop_time WHERE shop_id = ?';
+  db.query(query, [shopId], (err, results) => {
+    if (err) {
+      console.error('Error querying the database:', err);
+      res.status(500).json({ error: 'Database error' });
+      return;
+    }
+    res.json(results);
+  });
+}
+// tagsList
+const tagsList = async (req, res, next) => {
+  var db = req.db;
+  const query = 'SELECT category_name, sub_category_name, tags FROM filter_tags';
+  db.query(query, (err, rows) => {
+    if (err) {
+      console.error('Error executing query:', err);
+      res.status(500).json({ error: 'Internal Server Error' });
+      return;
+    }
+    const mergedData = {};
+    rows.forEach((row) => {
+      const { category_name, sub_category_name, tags } = row;
+      if (!mergedData[category_name]) {
+        mergedData[category_name] = {};
+      }
+
+      if (!mergedData[category_name][sub_category_name]) {
+        mergedData[category_name][sub_category_name] = {
+          filters: tags,
+        };
+      }
+    });
+    res.json(mergedData);
+  });
+}
+// filterTags
+const filterTagsList = async (req, res, next) => {
+  var db = req.db;
+  const tag = req.params.tag;
+  const sql = `
+    SELECT s.*, COALESCE(AVG(r.rating), 0) AS average_rating
+    FROM shop s
+    LEFT JOIN review r ON s.shop_id = r.shop_id
+    WHERE s.tags LIKE ?
+    GROUP BY s.shop_id
+  `;
+  const searchTerm = `%${tag}%`;
+  db.query(sql, [searchTerm], (err, rows) => {
+    if (err) {
+      console.error('Error executing query:', err);
+      res.status(500).json({ error: 'Internal Server Error' });
+      return;
+    }
+    res.json(rows);
   });
 }
 
@@ -1146,5 +1284,10 @@ module.exports = {
   postTags,
   categoryPost,
   reviewAdd,
-  getReview
+  getReview,
+  filterTags,
+  allShopList,
+  shopTime,
+  tagsList,
+  filterTagsList
 };
