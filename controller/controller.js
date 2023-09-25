@@ -55,7 +55,6 @@ const userLogin = async (req, res, next) => {
   // Retrieve the user from the database based on the username
   db.query("SELECT * FROM user WHERE mobile = ?", [mobile], (err, rows) => {
     if (err) {
-      console.log("Error executing query: ", err);
       res.status(500).json({ error: "Internal server error" });
       return err;
     }
@@ -249,7 +248,6 @@ const categoryList = async (req, res, next) => {
     var db = req.db;
     let results = await db.query("SELECT * FROM category ORDER BY CAST(serial_no AS SIGNED) ASC", function (error, rows) {
       if (error) {
-        console.log("Error fetching data from database");
         res.send({
           status: 0,
           message: "Error fetching data from database",
@@ -263,7 +261,6 @@ const categoryList = async (req, res, next) => {
       }
     });
   } catch (error) {
-    console.log("Error:", error);
     res.send({
       status: 0,
       message: "An error occurred",
@@ -569,7 +566,6 @@ const pendingShop = async (req, res, next) => {
       [data],
       (err, result) => {
         if (err) {
-          console.log('err', err);
           // Rollback the transaction if there's an error
           db.rollback(() => {
             res.status(500).json({ error: 'Error inserting data into pending table' });
@@ -675,15 +671,20 @@ const singleShop = async (req, res, next) => {
   try {
     const db = req.db;
     const shopId = req.params.id;
-    const query = "SELECT * FROM shop WHERE shop_id = ?";
+    const query = `
+    SELECT s.*, COALESCE(AVG(r.rating), 0) AS average_rating
+    FROM shop s
+    LEFT JOIN review r ON s.shop_id = r.shop_id
+    WHERE s.shop_id = ?
+    GROUP BY s.shop_id
+  `;
     db.query(query, [shopId], (err, results) => {
       if (err) {
         console.error("Error fetching shop:", err);
         return;
       }
-
       if (results.length > 0) {
-        res.status(200).json(results[0]); // Return the first shop found
+        res.status(200).json(results[0]);
       } else {
         res.status(404).json({
           message: "Shop not found",
@@ -1025,7 +1026,6 @@ const filterTagDelete = async (req, res, next) => {
     const sqlUpdate = 'UPDATE filter_tags SET tags = ? WHERE filter_id = ?';
     db.query(sqlUpdate, [JSON.stringify(updatedArray), filterId], (err, result) => {
       if (err) {
-        console.log(err);
         return res.status(500).json({ error: 'Error while updating data.' });
       }
 
@@ -1227,22 +1227,26 @@ const tagsList = async (req, res, next) => {
 // filterTags
 const filterTagsList = async (req, res, next) => {
   var db = req.db;
-  const tag = req.params.tag;
+  const searchParam = `%${req.params.tag}%`;
+
   const sql = `
     SELECT s.*, COALESCE(AVG(r.rating), 0) AS average_rating
     FROM shop s
     LEFT JOIN review r ON s.shop_id = r.shop_id
-    WHERE s.tags LIKE ?
+    WHERE (s.tags LIKE ? OR s.category LIKE ? OR s.sub_category LIKE ?)
     GROUP BY s.shop_id
   `;
-  const searchTerm = `%${tag}%`;
-  db.query(sql, [searchTerm], (err, rows) => {
+  
+  db.query(sql, [searchParam, searchParam, searchParam], (err, rows) => {
     if (err) {
-      console.error('Error executing query:', err);
       res.status(500).json({ error: 'Internal Server Error' });
       return;
     }
-    res.json(rows);
+    if (rows.length === 0) {
+      res.status(200).json({ statusCode: 200 });
+    } else {
+      res.json(rows);
+    }
   });
 }
 

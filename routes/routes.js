@@ -62,5 +62,10 @@ router.post('/filterTags', controller.filterTags)
 router.get('/allShopList', controller.allShopList)
 router.get('/shopTime/:id', controller.shopTime)
 router.get('/tagsList', controller.tagsList)
+// category
+// router.get('/category/:tag', controller.categoryLists)
+// sub category
+// router.get('/subCategory/:tag', controller.subCategoryLists)
+// filter
 router.get('/filterTagsList/:tag', controller.filterTagsList)
 module.exports = router;
