@@ -1164,14 +1164,14 @@ const allShopList = async (req, res, next) => {
     var db = req.db;
     const { page, pageSize } = req.query;
     const offset = (page - 1) * pageSize;
-    // const sql = `SELECT * FROM shop LIMIT ${pageSize} OFFSET ${offset}`;
     const sql = `
-   SELECT s.*, COALESCE(AVG(r.rating), 0) AS average_rating
-   FROM shop s
-   LEFT JOIN review r ON s.shop_id = r.shop_id
-   GROUP BY s.shop_id
-   LIMIT ${pageSize} OFFSET ${offset}
- `;
+      SELECT s.*, COALESCE(AVG(r.rating), 0) AS average_rating, MAX(rating) AS max_rating
+      FROM shop s
+      LEFT JOIN review r ON s.shop_id = r.shop_id
+      GROUP BY s.shop_id
+      ORDER BY average_rating DESC, max_rating DESC
+      LIMIT ${pageSize} OFFSET ${offset}
+    `;
     db.query(sql, (err, result) => {
       if (err) {
         console.error(err);
@@ -1184,6 +1184,7 @@ const allShopList = async (req, res, next) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 }
+
 // shop time
 const shopTime = async (req, res, next) => {
   var db = req.db;
@@ -1249,6 +1250,29 @@ const filterTagsList = async (req, res, next) => {
     }
   });
 }
+// check shop 
+const checkShop = async (req, res, next) => {
+  var db = req.db;
+  const { user_id, shop_id } = req.query;
+  const sql = 'SELECT * FROM shop WHERE mobile = ? AND shop_id = ?';
+
+  db.query(sql, [user_id, shop_id], (err, results) => {
+    if (err) {
+      console.error('Error executing SQL query:', err);
+      res.status(500).json({ error: 'Internal server error' });
+      return;
+    }
+
+    if (results.length > 0) {
+      // A row with the given user_id and shop_id combination exists
+      res.json({ exists: true });
+    } else {
+      // No matching row found
+      res.json({ exists: false });
+    }
+  });
+}
+
 
 module.exports = {
   displayData,
@@ -1293,5 +1317,6 @@ module.exports = {
   allShopList,
   shopTime,
   tagsList,
-  filterTagsList
+  filterTagsList,
+  checkShop
 };

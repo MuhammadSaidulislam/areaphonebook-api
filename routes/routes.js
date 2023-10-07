@@ -62,6 +62,7 @@ router.post('/filterTags', controller.filterTags)
 router.get('/allShopList', controller.allShopList)
 router.get('/shopTime/:id', controller.shopTime)
 router.get('/tagsList', controller.tagsList)
+router.get('/checkShop', controller.checkShop)
 // category
 // router.get('/category/:tag', controller.categoryLists)
 // sub category
