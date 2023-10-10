@@ -25,12 +25,13 @@ router.post('/category', upload.single('category_image'), controller.createCateg
 router.get('/categoryList', controller.categoryList)
 router.get('/allSubcategoryList', controller.allSubcategoryList)
 router.post('/subcategory', upload.single('sub_category_image'), controller.createSubCategory)
+router.put('/subcategory/:id', upload.single('sub_category_image'), controller.subCategoryUpdate)
 router.post('/subcategorylist', controller.getSubCategory)
 router.post('/AllShopList', controller.shopList)
 router.post('/singleShopShow/:id', controller.singleShop)
 router.get('/showAll', controller.displayData);
 router.post('/create', controller.createShop);
-router.put('/update/:id', controller.updateShop);
+router.put('/update/:id', upload.single('shop_image'), controller.updateShop);
 router.post('/pendingShop', upload.single('shop_image'), controller.pendingShop);
 router.get('/pending', controller.pendingList)
 router.delete('/pendingDelete/:id', controller.deletePending)
@@ -69,4 +70,6 @@ router.get('/checkShop', controller.checkShop)
 // router.get('/subCategory/:tag', controller.subCategoryLists)
 // filter
 router.get('/filterTagsList/:tag', controller.filterTagsList)
+router.post('/save', controller.saveList)
+router.get('/sidebar', controller.sidebar)
 module.exports = router;
