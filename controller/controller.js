@@ -161,33 +161,105 @@ const createShop = async (req, res, next) => {
 };
 // shop update
 const updateShop = async (req, res, next) => {
-  try {
-    const db = req.db;
-    const shopId = req.params.id;
-    const data = req.body;
+  const db = req.db;
+  const shop_id = req.params.id;
+  const { weeklyDays } = req.body;
+  const dataToUpdate = {
+    ...(req.file && { shop_image: req.file.filename }),
+    category: req.body.category,
+    sub_category: req.body.sub_category,
+    title: req.body.title,
+    number: req.body.number,
+    address: req.body.address,
+    service: req.body.service,
+    mobile: req.body.mobile,
+    tags: req.body.tags,
+    phone_show: req.body.phone_show,
+    related_shop: req.body.related_shop
+  };
 
+  const weeklyDaysData = JSON.parse(weeklyDays);
+
+  db.beginTransaction((err) => {
+    if (err) {
+      console.error('Error starting transaction:', err);
+      return res.status(500).json({ error: 'Error starting transaction' });
+    }
+
+    // Update the main shop information
     db.query(
-      "UPDATE shop SET ? WHERE shop_id = ?",
-      [data, shopId],
-      function (err, rows) {
+      'UPDATE shop SET ? WHERE shop_id = ?',
+      [dataToUpdate, shop_id],
+      (err, result) => {
         if (err) {
-          console.error("Error updating shop:", err);
-          res.status(500).send({ message: "Error updating shop" });
-          return;
-        }
-
-        if (rows.affectedRows === 0) {
-          res.status(404).send({ message: "Shop not found" });
+          db.rollback(() => {
+            console.error('Error updating shop:', err);
+            res.status(500).json({ error: 'Error updating shop' });
+          });
         } else {
-          res.status(200).send({ message: "Shop updated successfully" });
+          // Delete existing shop_time entries for this shop
+          db.query('DELETE FROM shop_time WHERE shop_id = ?', [shop_id], (err) => {
+            if (err) {
+              db.rollback(() => {
+                console.error('Error deleting existing shop_time entries:', err);
+                res.status(500).json({ error: 'Error updating shop' });
+              });
+            } else {
+              // Insert new shop_time entries if provided
+              if (Array.isArray(weeklyDaysData) && weeklyDaysData.length > 0) {
+                const insertShopTimeQuery =
+                  'INSERT INTO shop_time (shop_id, day, start_time, end_time) VALUES (?, ?, ?, ?)';
+
+                weeklyDaysData.forEach((dayData, index) => {
+                  const { day, start_time, end_time } = dayData;
+                  db.query(
+                    insertShopTimeQuery,
+                    [shop_id, day, start_time, end_time],
+                    (err) => {
+                      if (err) {
+                        db.rollback(() => {
+                          console.error(`Error inserting data for ${day} in shop_time table`, err);
+                          res.status(500).json({ error: `Error inserting data for ${day} in shop_time table` });
+                        });
+                      } else {
+                        if (index === weeklyDaysData.length - 1) {
+                          // If all shop_time data is inserted successfully, commit the transaction
+                          db.commit((err) => {
+                            if (err) {
+                              db.rollback(() => {
+                                console.error('Error committing transaction:', err);
+                                res.status(500).json({ error: 'Error committing transaction' });
+                              });
+                            } else {
+                              res.status(200).json({ message: 'Shop updated successfully' });
+                            }
+                          });
+                        }
+                      }
+                    }
+                  );
+                });
+              } else {
+                // If no shop_time data is provided, directly commit the transaction
+                db.commit((err) => {
+                  if (err) {
+                    db.rollback(() => {
+                      console.error('Error committing transaction:', err);
+                      res.status(500).json({ error: 'Error committing transaction' });
+                    });
+                  } else {
+                    res.status(200).json({ message: 'Shop updated successfully' });
+                  }
+                });
+              }
+            }
+          });
         }
       }
     );
-  } catch (error) {
-    console.error("Error updating shop:", error);
-    res.status(500).send({ message: "Error updating shop" });
-  }
+  });
 };
+
 // category
 const createCategory = async (req, res, next) => {
   try {
@@ -457,12 +529,13 @@ const adminLogin = async (req, res, next) => {
 const userProfile = async (req, res, next) => {
   try {
     const db = req.db;
-    const { userMobile } = req.body;
+    const { userMobile } = req.body; // Only userMobile is used in this example
+
     // Query to fetch data from the shop table
     const shopQuery = `
       SELECT *
       FROM shop
-      WHERE mobile = ? AND post_id = ''
+      WHERE mobile = ? AND post_id = '' 
     `;
     db.query(shopQuery, userMobile, (shopErr, shopResults) => {
       if (shopErr) {
@@ -516,13 +589,17 @@ const userProfile = async (req, res, next) => {
           // Merge the shop, shop_time, and rating data based on shop_id
           const userProfileData = shopResults.map((shop) => {
             const shopTimeData = timeResults.filter((time) => time.shop_id === shop.shop_id);
-            const averageRating = averageRatingsMap[shop.shop_id] || 0; // Use 0 if no rating found
+            const averageRating = averageRatingsMap[shop.shop_id] || 0;
+
+            // You can add other fields here as needed
             return {
               ...shop,
               shop_time: shopTimeData,
               average_rating: averageRating,
             };
           });
+
+
 
           res.status(200).json(userProfileData);
         });
@@ -532,7 +609,7 @@ const userProfile = async (req, res, next) => {
     console.error("Error in userProfile:", error);
     res.status(500).json({ error: "Error in userProfile" });
   }
-};
+}
 // create pending shop
 const pendingShop = async (req, res, next) => {
   var db = req.db;
@@ -560,7 +637,6 @@ const pendingShop = async (req, res, next) => {
       console.error('Error starting transaction:', err);
       return res.status(500).json({ error: 'Error starting transaction' });
     }
-    // Insert data into the "pending" table
     db.query(
       "Insert into pending_shop set ? ",
       [data],
@@ -948,7 +1024,6 @@ const singleCategory = async (req, res, next) => {
 };
 
 // category update
-
 const categoryUpdate = async (req, res, next) => {
   var db = req.db;
   const categoryId = req.params.id;
@@ -956,14 +1031,12 @@ const categoryUpdate = async (req, res, next) => {
     category_name: req.body.category_name,
     serial_no: req.body.serial_no,
   };
-
   // Check if an image was uploaded
   if (req.file) {
     data.category_image = req.file.filename;
   }
 
-
-  const sql = 'UPDATE category SET ? WHERE serial_no = ?';
+  const sql = 'UPDATE category SET ? WHERE category_name = ?';
   db.query(sql, [data, categoryId], (err, result) => {
     if (err) {
       return res.status(500).json({ status: 500, error: 'Error while updating category data.' });
@@ -972,11 +1045,57 @@ const categoryUpdate = async (req, res, next) => {
     if (result.affectedRows === 0) {
       return res.status(404).json({ status: 404, error: 'Category not found.' });
     }
+    const updateSubcategorySql = 'UPDATE subcategory SET category_name = ? WHERE category_name = ?';
+    const updateSubcategorySql2 = 'UPDATE filter_tags SET category_name = ? WHERE category_name = ?';
+    const updateSubcategorySql3 = 'UPDATE shop SET category  = ? WHERE category  = ?';
+    const updateSubcategorySql4 = 'UPDATE pending_shop SET category = ? WHERE category = ?';
+    db.query(updateSubcategorySql, [req.body.category_name, categoryId], (subError) => {
+      if (subError) {
+        console.error('Error while updating subcategory data: ' + subError.message);
+      }
+      db.query(updateSubcategorySql2, [req.body.category_name, categoryId], (subError) => {
+        if (subError) {
+          console.error('Error while updating subcategory data: ' + subError.message);
+        }
+        db.query(updateSubcategorySql3, [req.body.category_name, categoryId], (subError) => {
+          if (subError) {
+            console.error('Error while updating subcategory data: ' + subError.message);
+          }
+          db.query(updateSubcategorySql4, [req.body.category_name, categoryId], (subError) => {
+            if (subError) {
+              console.error('Error while updating subcategory data: ' + subError.message);
+            }
+            res.json({ message: 'Category updated successfully.' });
+          });
+        });
+      });
 
+    });
+
+  });
+}
+// sub-category update
+const subCategoryUpdate = async (req, res, next) => {
+  var db = req.db;
+  const categoryId = req.params.id;
+  var data = {
+    category_name: req.body.category_name,
+    serial_no: req.body.serial_no,
+  };
+  if (req.file) {
+    data.category_image = req.file.filename;
+  }
+  const sql = 'UPDATE category SET ? WHERE serial_no = ?';
+  db.query(sql, [data, categoryId], (err, result) => {
+    if (err) {
+      return res.status(500).json({ status: 500, error: 'Error while updating category data.' });
+    }
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ status: 404, error: 'Category not found.' });
+    }
     res.json({ message: 'Category updated successfully.' });
   });
 }
-
 // delete sub category
 const deleteSubCategory = async (req, res, next) => {
   var db = req.db;
@@ -1237,7 +1356,7 @@ const filterTagsList = async (req, res, next) => {
     WHERE (s.tags LIKE ? OR s.category LIKE ? OR s.sub_category LIKE ?)
     GROUP BY s.shop_id
   `;
-  
+
   db.query(sql, [searchParam, searchParam, searchParam], (err, rows) => {
     if (err) {
       res.status(500).json({ error: 'Internal Server Error' });
@@ -1272,7 +1391,99 @@ const checkShop = async (req, res, next) => {
     }
   });
 }
+// save shop
+const saveList = async (req, res, next) => {
+  var db = req.db;
+  const { shop_id, item_id } = req.body;
 
+  // Retrieve the current save_list for the shop_id
+  db.query('SELECT save_list FROM shop WHERE shop_id = ?', [shop_id], (err, results) => {
+    if (err) {
+      console.error('Error retrieving save_list:', err);
+      res.status(500).json({ error: 'Internal Server Error' });
+      return;
+    }
+
+    // Parse the existing save_list as JSON (or initialize an empty array)
+    const existingSaveList = results[0]?.save_list ? JSON.parse(results[0].save_list) : [];
+
+    // Add the new item_id to the save_list
+    existingSaveList.push(item_id);
+
+    // Update the shop record with the modified save_list
+    db.query('UPDATE shop SET save_list = ? WHERE shop_id = ?', [JSON.stringify(existingSaveList), shop_id], (err, result) => {
+      if (err) {
+        console.error('Error updating save_list:', err);
+        res.status(500).json({ error: 'Internal Server Error' });
+        return;
+      }
+
+      console.log(`Item ${item_id} added to the save_list for shop ${shop_id}`);
+      res.status(200).json({ message: 'Item added to the save list successfully' });
+    });
+  });
+}
+// sidebar
+const sidebar = async (req, res, next) => {
+  var db = req.db;
+  db.query('SELECT * FROM category', (error, categories) => {
+    if (error) {
+      console.error('Error fetching categories: ' + error.message);
+      res.status(500).json({ error: 'Internal Server Error' });
+      return;
+    }
+    const output = {};
+
+    if (categories.length === 0) {
+      // If there are no categories, send an empty response
+      res.json(output);
+      return;
+    }
+
+    let processedCategories = 0;
+    categories.forEach((category) => {
+      const category_name = category.category_name;
+      const category_image = category.category_image;
+      output[category_name] = [{ category_name, category_image }];
+
+      db.query('SELECT * FROM subcategory WHERE category_name = ?', [category_name], (subError, subcategories) => {
+        if (subError) {
+          console.error('Error fetching subcategories: ' + subError.message);
+          // Don't send an error response here, continue processing other subcategories
+          return;
+        }
+
+        if (subcategories.length === 0) {
+          // If there are no subcategories for this category, send an empty response for this category
+          if (++processedCategories === categories.length) {
+            res.json(output);
+          }
+          return;
+        }
+
+        subcategories.forEach((subcategory) => {
+          const sub_category_name = subcategory.sub_category_name;
+
+          db.query('SELECT * FROM filter_tags WHERE sub_category_name = ?', [sub_category_name], (filterError, filters) => {
+            if (filterError) {
+              console.error('Error fetching filters: ' + filterError.message);
+              // Don't send an error response here, continue processing other subcategories
+              return;
+            }
+
+            const filterNames = filters.map((filter) => filter.tags);
+            if (output[category_name]) {
+              output[category_name].push({ [sub_category_name]: { filters: filterNames } });
+            }
+            if (++processedCategories === categories.length && output[category_name].length - 1 === subcategories.length) {
+              res.json(output);
+            }
+          });
+        });
+      });
+    });
+  });
+}
 
 module.exports = {
   displayData,
@@ -1318,5 +1529,8 @@ module.exports = {
   shopTime,
   tagsList,
   filterTagsList,
-  checkShop
+  checkShop,
+  saveList,
+  sidebar,
+  subCategoryUpdate
 };
