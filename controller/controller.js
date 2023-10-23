@@ -5,18 +5,22 @@ const Joi = require("joi");
 
 // registration
 const registration = async (req, res, next) => {
-  // Validate request body using Joi
   var db = req.db;
   const schema = Joi.object({
     mobile: Joi.string().min(3).required(),
-    password: Joi.string().min(6).required(),
+    password: Joi.string().min(1).required(),
+    user_name: Joi.string().optional(),
+    address: Joi.string().optional(),
+    image: Joi.string().base64().allow('').optional(),
   });
+
   const { error, value } = schema.validate(req.body);
   if (error) {
     res.status(400).json({ error: error.details[0].message });
     return;
   }
   const { mobile, password } = value;
+
   // Check if the username is already taken
   db.query("SELECT * FROM user WHERE mobile = ?", [mobile], (err, rows) => {
     if (err) {
@@ -29,12 +33,21 @@ const registration = async (req, res, next) => {
       res.status(409).json({ error: "mobile already exists" });
       return;
     }
-
-    // Insert the user into the database
     bcrypt.hash(password, 10, (err, hashedPassword) => {
+      var data = {
+        mobile: mobile,
+        password: hashedPassword,
+        user_name: req.body.user_name,
+        address: req.body.address,
+      };
+
+      // Check if an image was provided before adding it to the data object
+      if (req.file && req.file.filename) {
+        data.image = req.file.filename;
+      }
       db.query(
-        "INSERT INTO user (mobile, password) VALUES (?, ?)",
-        [mobile, hashedPassword],
+        "INSERT INTO user set ?",
+        [data],
         (err, result) => {
           if (err) {
             console.error("Error executing query: ", err);
@@ -47,6 +60,36 @@ const registration = async (req, res, next) => {
     });
   });
 };
+const userPassword = async (req, res, next) => {
+  var db = req.db;
+  const mobile = req.params.mobile;
+  const newPassword = req.body.newPassword;
+
+  if (!newPassword || newPassword.length < 1) {
+    return res.status(400).json({ error: "New password is invalid" });
+  }
+
+  bcrypt.hash(newPassword, 10, (err, hashedPassword) => {
+    if (err) {
+      console.error("Error hashing the password: ", err);
+      res.status(500).json({ error: "Internal server error" });
+      return;
+    }
+    const sql = "UPDATE user SET password = ? WHERE mobile = ?";
+    db.query(sql, [hashedPassword, mobile], (err, result) => {
+      if (err) {
+        console.error("Error updating password: ", err);
+        res.status(500).json({ error: "Internal server error" });
+      } else {
+        if (result.affectedRows === 0) {
+          res.status(404).json({ error: "User not found", result });
+        } else {
+          res.status(200).json({ mobile });
+        }
+      }
+    });
+  });
+}
 // login
 const userLogin = async (req, res, next) => {
   // Validate request body using Joi
@@ -370,9 +413,8 @@ const createSubCategory = async (req, res, next) => {
     var data = {
       category_name: req.body.category_name,
       sub_category_name: req.body.sub_category_name,
-      sub_category_image: req.file.filename,
+      sub_category_id: req.body.sub_category_id
     };
-
     db.query(
       "Insert into subcategory set ? ",
       [data],
@@ -529,8 +571,7 @@ const adminLogin = async (req, res, next) => {
 const userProfile = async (req, res, next) => {
   try {
     const db = req.db;
-    const { userMobile } = req.body; // Only userMobile is used in this example
-
+    const { userMobile } = req.body;
     // Query to fetch data from the shop table
     const shopQuery = `
       SELECT *
@@ -1022,6 +1063,27 @@ const singleCategory = async (req, res, next) => {
     res.json(category);
   });
 };
+// single subcategory
+const singleSubCategory = async (req, res, next) => {
+
+  var db = req.db;
+  const subCategoryId = req.params.id;
+
+  // Write SQL query to fetch the category information
+  const sql = 'SELECT * FROM subcategory WHERE sub_category_id = ?';
+
+  db.query(sql, [subCategoryId], (err, results) => {
+    if (err) {
+      return res.status(500).json({ error: 'Error while fetching category information.' });
+    }
+    if (results.length === 0) {
+      return res.status(404).json({ error: 'Category not found.' });
+    }
+    const category = results[0];
+    res.json(category);
+  });
+};
+
 
 // category update
 const categoryUpdate = async (req, res, next) => {
@@ -1074,26 +1136,46 @@ const categoryUpdate = async (req, res, next) => {
 
   });
 }
+
 // sub-category update
 const subCategoryUpdate = async (req, res, next) => {
   var db = req.db;
-  const categoryId = req.params.id;
+  const subCategoryId = req.params.id;
+  const oldSubCategory = req.body.old_subcategory;
+
   var data = {
     category_name: req.body.category_name,
-    serial_no: req.body.serial_no,
+    sub_category_name: req.body.sub_category_name,
+    sub_category_id: req.body.sub_category_id
   };
-  if (req.file) {
-    data.category_image = req.file.filename;
-  }
-  const sql = 'UPDATE category SET ? WHERE serial_no = ?';
-  db.query(sql, [data, categoryId], (err, result) => {
+
+  const sql = 'UPDATE subcategory SET ? WHERE sub_category_id = ?';
+  db.query(sql, [data, subCategoryId], (err, result) => {
     if (err) {
       return res.status(500).json({ status: 500, error: 'Error while updating category data.' });
     }
     if (result.affectedRows === 0) {
       return res.status(404).json({ status: 404, error: 'Category not found.' });
     }
-    res.json({ message: 'Category updated successfully.' });
+    const updateSubcategorySql2 = 'UPDATE filter_tags SET sub_category_name = ? WHERE sub_category_name = ?';
+    const updateSubcategorySql3 = 'UPDATE shop SET sub_category  = ? WHERE sub_category  = ?';
+    const updateSubcategorySql4 = 'UPDATE pending_shop SET sub_category = ? WHERE sub_category = ?';
+    db.query(updateSubcategorySql2, [req.body.sub_category_name, oldSubCategory], (subError) => {
+      if (subError) {
+        console.error('Error while updating subcategory data: ' + subError.message);
+      }
+      db.query(updateSubcategorySql3, [req.body.sub_category_name, oldSubCategory], (subError) => {
+        if (subError) {
+          console.error('Error while updating subcategory data: ' + subError.message);
+        }
+        db.query(updateSubcategorySql4, [req.body.sub_category_name, oldSubCategory], (subError) => {
+          if (subError) {
+            console.error('Error while updating subcategory data: ' + subError.message);
+          }
+          res.json({ message: 'Category updated successfully.' });
+        });
+      });
+    });
   });
 }
 // delete sub category
@@ -1222,13 +1304,13 @@ const categoryPost = async (req, res, next) => {
 const reviewAdd = async (req, res, next) => {
   try {
     var db = req.db;
-    const { rating, user_name, review, shop_id, time_set } = req.body;
+    const { rating, mobile, review, shop_id, time_set } = req.body;
 
     const insertQuery = `
-      INSERT INTO review (rating, user_name, review, shop_id,time_set)
+      INSERT INTO review (rating, mobile, review, shop_id,time_set)
       VALUES (?, ?, ?, ?,?)
     `;
-    await db.query(insertQuery, [rating, user_name, review, shop_id, time_set]);
+    await db.query(insertQuery, [rating, mobile, review, shop_id, time_set]);
     res.json({ message: 'Review added successfully' });
   } catch (error) {
     console.error(error);
@@ -1239,7 +1321,16 @@ const reviewAdd = async (req, res, next) => {
 const getReview = async (req, res, next) => {
   var db = req.db;
   const shopId = req.params.id;
-  const query = `SELECT * FROM review WHERE shop_id = ? ORDER BY time_set DESC`;
+
+  // Query to retrieve data from both "review" and "user" tables using an INNER JOIN
+  const query = `
+  SELECT review.*, user.user_name, user.mobile,user.image
+  FROM review
+  INNER JOIN user ON review.mobile = user.mobile
+  WHERE review.shop_id = ?
+  ORDER BY review.time_set DESC
+`;
+
   db.query(query, [shopId], (err, results) => {
     if (err) {
       console.error('Error querying the database:', err);
@@ -1320,29 +1411,35 @@ const shopTime = async (req, res, next) => {
 }
 // tagsList
 const tagsList = async (req, res, next) => {
-  var db = req.db;
-  const query = 'SELECT category_name, sub_category_name, tags FROM filter_tags';
-  db.query(query, (err, rows) => {
-    if (err) {
-      console.error('Error executing query:', err);
-      res.status(500).json({ error: 'Internal Server Error' });
-      return;
-    }
-    const mergedData = {};
-    rows.forEach((row) => {
-      const { category_name, sub_category_name, tags } = row;
-      if (!mergedData[category_name]) {
-        mergedData[category_name] = {};
-      }
+  try {
+    var db = req.db;
+    const query = 'SELECT category_name, sub_category_name, tags FROM filter_tags';
 
-      if (!mergedData[category_name][sub_category_name]) {
-        mergedData[category_name][sub_category_name] = {
-          filters: tags,
-        };
+    db.query(query, (err, rows) => {
+      if (err) {
+        console.error('Error executing query:', err);
+        res.status(500).json({ error: 'Internal Server Error' });
+        return;
       }
+      const mergedData = {};
+      rows.forEach((row) => {
+        const { category_name, sub_category_name, tags } = row;
+        if (!mergedData[category_name]) {
+          mergedData[category_name] = {};
+        }
+
+        if (!mergedData[category_name][sub_category_name]) {
+          mergedData[category_name][sub_category_name] = {
+            filters: tags,
+          };
+        }
+      });
+      res.json(mergedData);
     });
-    res.json(mergedData);
-  });
+  } catch (error) {
+    console.error('Error in tagsList:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
 }
 // filterTags
 const filterTagsList = async (req, res, next) => {
@@ -1395,95 +1492,212 @@ const checkShop = async (req, res, next) => {
 const saveList = async (req, res, next) => {
   var db = req.db;
   const { shop_id, item_id } = req.body;
-
-  // Retrieve the current save_list for the shop_id
   db.query('SELECT save_list FROM shop WHERE shop_id = ?', [shop_id], (err, results) => {
     if (err) {
-      console.error('Error retrieving save_list:', err);
       res.status(500).json({ error: 'Internal Server Error' });
       return;
     }
-
-    // Parse the existing save_list as JSON (or initialize an empty array)
     const existingSaveList = results[0]?.save_list ? JSON.parse(results[0].save_list) : [];
-
-    // Add the new item_id to the save_list
     existingSaveList.push(item_id);
-
-    // Update the shop record with the modified save_list
     db.query('UPDATE shop SET save_list = ? WHERE shop_id = ?', [JSON.stringify(existingSaveList), shop_id], (err, result) => {
       if (err) {
-        console.error('Error updating save_list:', err);
         res.status(500).json({ error: 'Internal Server Error' });
         return;
       }
-
-      console.log(`Item ${item_id} added to the save_list for shop ${shop_id}`);
       res.status(200).json({ message: 'Item added to the save list successfully' });
     });
   });
 }
 // sidebar
 const sidebar = async (req, res, next) => {
-  var db = req.db;
-  db.query('SELECT * FROM category', (error, categories) => {
-    if (error) {
-      console.error('Error fetching categories: ' + error.message);
-      res.status(500).json({ error: 'Internal Server Error' });
-      return;
-    }
+  const db = req.db;
+
+  try {
+    const categories = await new Promise((resolve, reject) => {
+      db.query('SELECT * FROM category', (error, results) => {
+        if (error) {
+          console.error('Error fetching categories: ' + error.message);
+          return reject(error);
+        }
+        resolve(results);
+      });
+    });
+
     const output = {};
 
-    if (categories.length === 0) {
-      // If there are no categories, send an empty response
-      res.json(output);
-      return;
-    }
-
-    let processedCategories = 0;
-    categories.forEach((category) => {
+    for (const category of categories) {
       const category_name = category.category_name;
       const category_image = category.category_image;
       output[category_name] = [{ category_name, category_image }];
 
-      db.query('SELECT * FROM subcategory WHERE category_name = ?', [category_name], (subError, subcategories) => {
-        if (subError) {
-          console.error('Error fetching subcategories: ' + subError.message);
-          // Don't send an error response here, continue processing other subcategories
-          return;
-        }
-
-        if (subcategories.length === 0) {
-          // If there are no subcategories for this category, send an empty response for this category
-          if (++processedCategories === categories.length) {
-            res.json(output);
+      const subcategories = await new Promise((resolve, reject) => {
+        db.query('SELECT * FROM subcategory WHERE category_name = ?', [category_name], (subError, subResults) => {
+          if (subError) {
+            console.error('Error fetching subcategories: ' + subError.message);
+            return reject(subError);
           }
-          return;
-        }
+          resolve(subResults);
+        });
+      });
 
-        subcategories.forEach((subcategory) => {
-          const sub_category_name = subcategory.sub_category_name;
-
-          db.query('SELECT * FROM filter_tags WHERE sub_category_name = ?', [sub_category_name], (filterError, filters) => {
+      for (const subcategory of subcategories) {
+        const sub_category_name = subcategory.sub_category_name;
+        const filters = await new Promise((resolve, reject) => {
+          db.query('SELECT * FROM filter_tags WHERE sub_category_name = ?', [sub_category_name], (filterError, filterResults) => {
             if (filterError) {
               console.error('Error fetching filters: ' + filterError.message);
-              // Don't send an error response here, continue processing other subcategories
-              return;
+              return reject(filterError);
             }
-
-            const filterNames = filters.map((filter) => filter.tags);
-            if (output[category_name]) {
-              output[category_name].push({ [sub_category_name]: { filters: filterNames } });
-            }
-            if (++processedCategories === categories.length && output[category_name].length - 1 === subcategories.length) {
-              res.json(output);
-            }
+            resolve(filterResults);
           });
         });
+
+        // const filterNames = filters.map((filter) => filter.tags);
+        const filterNames = filters.map((filter) => filter.tags).join(', ');
+
+        if (output[category_name]) {
+          output[category_name].push({ [sub_category_name]: { filters: filterNames } });
+        }
+      }
+    }
+    res.json(output);
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+// profile
+const profile = async (req, res, next) => {
+  var db = req.db;
+  const mobile = req.params.mobile;
+  const sql = 'SELECT user_name, image, address, mobile FROM user WHERE mobile = ?';
+
+  db.query(sql, [mobile], (err, results) => {
+    if (err) {
+      console.error('Error executing query:', err);
+      res.status(500).send('Error fetching data');
+      return;
+    }
+    if (results.length === 0) {
+      res.status(404).send('User not found');
+    } else {
+      // Extract the specific columns you want from the first result
+      const { user_name, image, address, mobile } = results[0];
+      res.json({ user_name, image, address, mobile });
+    }
+  });
+};
+// all save list
+const AllSave = async (req, res, next) => {
+  var db = req.db;
+  const mobile = req.params.mobile;
+  const sql = 'SELECT * FROM shop WHERE JSON_CONTAINS(save_list, ?)';
+
+  db.query(sql, JSON.stringify(mobile), (err, results) => {
+    if (err) {
+      console.error('Error executing query:', err);
+      res.status(500).send('Error fetching data');
+      return;
+    }
+
+    if (results.length === 0) {
+      // No shops found for the user, send an error response
+      res.status(404).send('No shops found for the user');
+      return;
+    }
+
+    const shopIds = results.map((shop) => shop.shop_id);
+    const shopTimeQuery = `
+      SELECT *
+      FROM shop_time
+      WHERE shop_id IN (?)
+    `;
+    db.query(shopTimeQuery, [shopIds], (timeErr, timeResults) => {
+      if (timeErr) {
+        console.error("Error fetching shop_time data:", timeErr);
+        res.status(500).json({ error: "Error fetching shop_time data" });
+        return;
+      }
+
+      // Query to fetch average rating for each shop
+      const ratingQuery = `
+        SELECT shop_id, AVG(rating) AS average_rating
+        FROM review
+        WHERE shop_id IN (?)
+        GROUP BY shop_id
+      `;
+      db.query(ratingQuery, [shopIds], (ratingErr, ratingResults) => {
+        if (ratingErr) {
+          console.error("Error fetching average ratings:", ratingErr);
+          res.status(500).json({ error: "Error fetching average ratings" });
+          return;
+        }
+
+        // Create a map to store average ratings by shop_id
+        const averageRatingsMap = {};
+        ratingResults.forEach((ratingRow) => {
+          averageRatingsMap[ratingRow.shop_id] = ratingRow.average_rating;
+        });
+
+        // Merge the shop, shop_time, and rating data based on shop_id
+        const userProfileData = results.map((shop) => {
+          const shopTimeData = timeResults.filter((time) => time.shop_id === shop.shop_id);
+          const averageRating = averageRatingsMap[shop.shop_id] || 0;
+
+          // You can add other fields here as needed
+          return {
+            ...shop,
+            shop_time: shopTimeData,
+            average_rating: averageRating,
+          };
+        });
+        res.status(200).json(userProfileData);
       });
     });
   });
-}
+};
+
+// save list check
+const saveCheck = async (req, res, next) => {
+  const db = req.db;
+  const mobileIdToSearch = req.params.mobile;
+  const shopIdToSearch = req.body.shopId;
+  const sql = "SELECT * FROM shop WHERE shop_id = ? AND save_list LIKE ?";
+  const pattern = `%${mobileIdToSearch}%`;
+  db.query(sql, [shopIdToSearch, pattern], (error, results) => {
+    if (error) {
+      res.status(500).json({ error: 'Internal Server Error' });
+    } else {
+      if (results.length > 0) {
+        res.json({ exists: true, message: 'Mobile ID exists in save_list' });
+      } else {
+        res.json({ exists: false, message: 'Mobile ID does not exist in save_list' });
+      }
+    }
+  });
+};
+// save list check
+const deleteSave = async (req, res, next) => {
+  const db = req.db;
+  const mobileIdToDelete = req.params.mobile;
+  const shopId = req.body.shopId;
+
+  // SQL query to update the save_list, removing the mobile_id
+  const updateSql = "UPDATE shop SET save_list = REPLACE(save_list, ?, '') WHERE shop_id = ?";
+
+  db.query(updateSql, [mobileIdToDelete, shopId], (updateError, updateResults) => {
+    if (updateError) {
+      res.status(500).json({ error: 'Internal Server Error' });
+    } else {
+      // Check if any rows were affected by the update
+      if (updateResults.affectedRows > 0) {
+        res.json({ success: true, message: 'Data deleted successfully' });
+      } else {
+        res.json({ success: false, message: 'Mobile ID does not exist in save_list' });
+      }
+    }
+  });
+};
 
 module.exports = {
   displayData,
@@ -1532,5 +1746,11 @@ module.exports = {
   checkShop,
   saveList,
   sidebar,
-  subCategoryUpdate
+  subCategoryUpdate,
+  singleSubCategory,
+  userPassword,
+  profile,
+  AllSave,
+  saveCheck,
+  deleteSave
 };
