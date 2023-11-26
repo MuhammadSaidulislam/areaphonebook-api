@@ -387,14 +387,14 @@ const allSubcategoryList = async (req, res, next) => {
   try {
     var db = req.db;
     let results = await db.query(
-      "Select * from subcategory",
+      "SELECT * FROM subcategory ORDER BY createTime DESC",
       function (error, rows) {
         if (error) {
           console.log("Error db");
         } else {
           res.send({
             status: 1,
-            message: "succesfully get list",
+            message: "Successfully get list",
             data: rows,
           });
         }
@@ -410,10 +410,12 @@ const allSubcategoryList = async (req, res, next) => {
 const createSubCategory = async (req, res, next) => {
   try {
     var db = req.db;
+    var currentTime = new Date();
     var data = {
       category_name: req.body.category_name,
       sub_category_name: req.body.sub_category_name,
-      sub_category_id: req.body.sub_category_id
+      sub_category_id: req.body.sub_category_id,
+      createTime: currentTime 
     };
     db.query(
       "Insert into subcategory set ? ",
@@ -440,16 +442,13 @@ const createSubCategory = async (req, res, next) => {
 const getSubCategory = async (req, res, next) => {
   try {
     var db = req.db;
-    // const category_Id = req.params.categoryId;
     const { category_name } = req.body;
-    // Fetch subcategories under the specified category
     const query = "SELECT * FROM subcategory WHERE category_name = ?";
     db.query(query, [category_name], (err, results) => {
       if (err) {
         console.error("Error fetching subcategory:", err);
         return;
       }
-
       res.status(200).json(results);
     });
   } catch (error) {
@@ -656,8 +655,9 @@ const pendingShop = async (req, res, next) => {
   var db = req.db;
   const { weeklyDays } = req.body;
   const { shop_id } = req.body;
+  const shopImage = req.file ? req.file.filename : "";
   var data = {
-    shop_image: req.file.filename,
+    shop_image: shopImage,
     category: req.body.category,
     sub_category: req.body.sub_category,
     title: req.body.title,
@@ -671,6 +671,7 @@ const pendingShop = async (req, res, next) => {
     phone_show: req.body.phone_show,
     related_shop: req.body.related_shop
   };
+
   const weeklyDaysData = JSON.parse(weeklyDays);
 
   db.beginTransaction((err) => {
@@ -1375,12 +1376,19 @@ const allShopList = async (req, res, next) => {
     const { page, pageSize } = req.query;
     const offset = (page - 1) * pageSize;
     const sql = `
-      SELECT s.*, COALESCE(AVG(r.rating), 0) AS average_rating, MAX(rating) AS max_rating
-      FROM shop s
-      LEFT JOIN review r ON s.shop_id = r.shop_id
-      GROUP BY s.shop_id
-      ORDER BY average_rating DESC, max_rating DESC
-      LIMIT ${pageSize} OFFSET ${offset}
+    SELECT
+    s.*,
+    COALESCE(AVG(r.rating), 0) AS average_rating,
+    MAX(r.rating) AS max_rating
+  FROM
+    shop s
+    LEFT JOIN review r ON s.shop_id = r.shop_id
+  GROUP BY
+    s.shop_id
+  ORDER BY
+    max_rating DESC, average_rating DESC
+  LIMIT
+    ${pageSize} OFFSET ${offset};
     `;
     db.query(sql, (err, result) => {
       if (err) {
@@ -1514,7 +1522,7 @@ const sidebar = async (req, res, next) => {
 
   try {
     const categories = await new Promise((resolve, reject) => {
-      db.query('SELECT * FROM category', (error, results) => {
+      db.query('SELECT * FROM category ORDER BY serial_no DESC', (error, results) => {
         if (error) {
           console.error('Error fetching categories: ' + error.message);
           return reject(error);
@@ -1531,7 +1539,7 @@ const sidebar = async (req, res, next) => {
       output[category_name] = [{ category_name, category_image }];
 
       const subcategories = await new Promise((resolve, reject) => {
-        db.query('SELECT * FROM subcategory WHERE category_name = ?', [category_name], (subError, subResults) => {
+        db.query('SELECT * FROM subcategory WHERE category_name = ? ORDER BY createTime DESC', [category_name], (subError, subResults) => {
           if (subError) {
             console.error('Error fetching subcategories: ' + subError.message);
             return reject(subError);
@@ -1552,7 +1560,6 @@ const sidebar = async (req, res, next) => {
           });
         });
 
-        // const filterNames = filters.map((filter) => filter.tags);
         const filterNames = filters.map((filter) => filter.tags).join(', ');
 
         if (output[category_name]) {
@@ -1565,7 +1572,6 @@ const sidebar = async (req, res, next) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
-
 // profile
 const profile = async (req, res, next) => {
   var db = req.db;
